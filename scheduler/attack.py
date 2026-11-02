@@ -5,6 +5,9 @@
   밖으로 나가는 글자라 모두 가림(redact)을 거친다.
 - 호출: 지금 Codex 분석자와 같은 격리다(독립 임시 폴더, read-only, 셸과 웹 끔, 입력은 stdin 자료로만). codex.ask를 그대로 쓴다.
 - 답 형식: 판정(통과, 보완, 재작업)과 지적 최대 7개. 근거 위치가 없는 지적은 버리고, 형식 밖 응답은 공격 없음이다.
+- 공급자(261103-jipsa-02 사용자 답 1안): 설정 JIPSA_ATTACK_PROVIDER가 codex, claude, none 가운데 하나이고 기본은 codex다.
+  codex를 골랐는데 Codex 실행 파일이 없으면 none과 같게 돈다(Claude가 대신 공격하지 않는다). none은 호출하지 않는다.
+  claude는 가벼운 판정 호출과 같은 격리(도구와 웹 없음, 기본 시스템 프롬프트 교체, 입력은 stdin 자료로만)로 새 호출 한 번이고 결과지에 '같은 공급자 공격'을 적는다.
 - 사용량: Codex 창 비율을 보지 않고 늘 호출을 시도한다(261102-jipsa-44 사용자 선택). 한도 오류나 다른 실패면 '공격 없음(사유)'을 남기고 일을 막지 않는다.
 - 공방은 한 번이다. 같은 시도에 공격이 이미 있으면 다시 부르지 않는다. 결과를 낸 쪽이 지적마다 반영, 반박, 사람으로 답하고 보고서를 고친다.
 결과는 시도 폴더의 attack.json과 attack.md, 답은 attack_reply.json이다. 마감(record.close)이 요약을 meta의 attack 칸과 결과지에 붙인다.
@@ -165,6 +168,17 @@ def parse(text: str) -> dict | None:
 
 
 # ----- 호출 -----
+SAME_PROVIDER = "같은 공급자 공격"
+
+
+def _claude_ask(prompt: str, *, system: str | None = None, stage: str = "", run: str = "") -> str:
+    """claude 공급자의 공격 호출. judge와 같은 격리이고 작업자 모델로 새 호출 한 번이다."""
+    from adapters import claude
+    from scheduler.config import MODEL_WORKER
+
+    return claude.judge(prompt, system=system or "", model=MODEL_WORKER, timeout=600)
+
+
 def load(att_dir: Path) -> dict | None:
     try:
         data = json.loads((att_dir / ATTACK_JSON).read_text(encoding="utf-8"))
@@ -190,14 +204,32 @@ def run(meta: dict, att_dir: Path, *, diff: str | None = None, ask=None) -> dict
     old = load(att_dir)
     if old and old.get("state") == "있음":
         return {**old, "again": True}
+    from scheduler import codex_window
+
     run_id = meta.get("run_id") or ""
     base = {"run_id": run_id, "attempt": att_dir.name, "at": now_iso(), "model": ""}
     why = ""
-    if ask is None:
-        from adapters import codex
-        from scheduler.config import CODEX_MODEL
+    want = codex_window.attack_provider()
+    use = want if ask is not None else codex_window.effective_attack_provider()
+    base["provider"] = use
+    if use == "claude":
+        from scheduler.config import MODEL_WORKER
 
-        ask, base["model"] = codex.ask, CODEX_MODEL
+        base.update(same_provider=True, model=MODEL_WORKER)
+        ask = ask or _claude_ask
+    elif use == "codex":
+        if ask is None:
+            from adapters import codex
+            from scheduler.config import CODEX_MODEL
+
+            ask, base["model"] = codex.ask, CODEX_MODEL
+    else:
+        # none이거나 codex를 골랐는데 Codex가 없다. 호출하지 않고 일을 막지 않는다
+        why = "공격 공급자 none(설정)" if want == "none" else "Codex 없음(공급자 codex는 none과 같게 돈다)"
+        data = {**base, "state": "없음", "why": why}
+        _save(att_dir, data)
+        events.emit("attack", run=run_id, state="없음", why=why, findings=0, verdict="")
+        return data
     try:
         text = ask(gather(meta, att_dir, diff=diff), system=instruction(), stage="attack", run=run_id)
     except LimitError as e:
@@ -265,7 +297,7 @@ def summary(run_id: str) -> dict | None:
     rep = replies(att)
     count = lambda a: sum(1 for f in fs if (rep.get(f["no"]) or {}).get("answer") == a)
     high_open = [f["no"] for f in fs if f.get("severity") == "상" and (rep.get(f["no"]) or {}).get("answer") in ("반박", "사람")]
-    return {"state": "있음", "verdict": data.get("verdict", ""), "n": len(fs), "applied": count("반영"), "rebut": count("반박"),
+    return {"state": "있음", "same_provider": bool(data.get("same_provider")), "verdict": data.get("verdict", ""), "n": len(fs), "applied": count("반영"), "rebut": count("반박"),
             "human": count("사람"), "unanswered": sum(1 for f in fs if not (rep.get(f["no"]) or {}).get("answer")), "high_open": high_open}
 
 
@@ -275,7 +307,7 @@ def short(s: dict | None) -> str:
         return ""
     if s.get("state") != "있음":
         return f"공격 없음({s.get('why') or '사유 없음'})"
-    return f"공격 {s['n']}, 반영 {s['applied']}, 사람 {s['human']}" + (f", 반박 {s['rebut']}" if s.get("rebut") else "")
+    return f"공격 {s['n']}, 반영 {s['applied']}, 사람 {s['human']}" + (f", 반박 {s['rebut']}" if s.get("rebut") else "") + (f", {SAME_PROVIDER}" if s.get("same_provider") else "")
 
 
 def slack_tail(s: dict | None) -> str:
@@ -291,7 +323,8 @@ def as_md(data: dict, reply: dict[int, dict] | None = None) -> str:
     """공격 기록을 사람이 읽는 md로. reply가 있으면 답 칸을 붙인다."""
     if data.get("state") != "있음":
         return f"# Sol 공격\n\n공격 없음({data.get('why') or '사유 없음'}).\n"
-    lines = ["# Sol 공격", "", f"판정은 {data.get('verdict')}이고 지적은 {len(data.get('findings') or [])}개다."
+    lines = ["# Sol 공격", "", *([f"{SAME_PROVIDER}이다. 작업자와 같은 계열 모델이 한 호출이라 맹점을 공유할 수 있다.", ""] if data.get("same_provider") else []),
+             f"판정은 {data.get('verdict')}이고 지적은 {len(data.get('findings') or [])}개다."
              + (f" 근거 위치가 없거나 형식 밖인 지적 {data['dropped']}개는 버렸다." if data.get("dropped") else ""), ""]
     lines += table(data, reply)
     return "\n".join(lines) + "\n"
@@ -324,7 +357,7 @@ def fold(run_id: str) -> str:
     if data.get("state") != "있음":
         return f"\nSol 공격 없음({data.get('why') or '사유 없음'}).\n"
     s = summary(run_id) or {}
-    return "\n".join(["", "<details>", f"<summary>{fold_title(data, s)}</summary>", "", f"Sol 판정은 {data.get('verdict')}이다.", "",
+    return "\n".join(["", "<details>", f"<summary>{fold_title(data, s)}</summary>", "", f"Sol 판정은 {data.get('verdict')}이다." + (f" {SAME_PROVIDER}이다." if data.get("same_provider") else ""), "",
                       *table(data, replies(dirs[-1])), "", "</details>", ""])
 
 
@@ -365,7 +398,7 @@ def note_line(run_id: str) -> str:
         return ""
     if s["state"] != "있음":
         return "Sol 공격 없음"
-    return f"Sol {s.get('verdict')} 지적 {s['n']}(반영 {s['applied']}, 사람 {s['human']}, 반박 {s['rebut']})"
+    return f"Sol {s.get('verdict')} 지적 {s['n']}(반영 {s['applied']}, 사람 {s['human']}, 반박 {s['rebut']})" + (f", {SAME_PROVIDER}" if s.get("same_provider") else "")
 
 
 def as_analysis(data: dict, status: str) -> str:

@@ -8,8 +8,8 @@ pid만으로 판단하지 않는다. 잠금이 없는 옛 스케줄러도 심장
 중간 프로세스를 한 번 거쳐 띄우므로 스케줄러의 부모가 대시보드가 아니고, 대시보드를 꺼도 스케줄러는 계속 돈다.
 둘 다 숨은 콘솔로 띄운다(261022-jipsa-35). 분리 플래그를 쓰면 가상환경 python 실행기가 띄우는 실제 python이 새 콘솔 창을 만든다.
 10분 안에 3번 꺼지면 다시 띄우기를 멈추고 화면에 경고와 로그 끝줄을 보인다. 심장박동만 멈춘 산 프로세스는 죽이지 않고 경고만 한다.
-사람이 끈 스케줄러도 멈춤으로 적어 감시가 다시 띄우지 않는다. 이 멈춤은 대시보드를 다시 켜도 남고,
-jipsa settings start나 jipsa settings restart로 풀고, jipsa run으로 다시 켜서 스케줄러가 살아 있어도 풀린다.
+Monitor(저장소 루트의 python monitor.py)에서 끈 스케줄러도 멈춤으로 적어 감시가 다시 띄우지 않는다. 이 멈춤은 대시보드를 다시 켜도 남고,
+Monitor나 jipsa settings start나 jipsa settings restart로 풀고, jipsa run으로 다시 켜서 스케줄러가 살아 있어도 풀린다.
 """
 
 from __future__ import annotations

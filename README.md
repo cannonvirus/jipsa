@@ -85,10 +85,11 @@ Slack, Codex, 상태줄처럼 필요할 때만 하는 단계, 임시 폴더로 �
 | `jipsa registry` | 프로젝트 등록을 보고 만들고 고친다 |
 | `jipsa settings` | 전역 설정을 보고 쓰고 되돌린다 |
 | `jipsa begin`, `jipsa finish` | 세션 서브에이전트 작업의 시작과 마감 |
-| `jipsa attack` | Codex 반대 검토를 돌린다 |
+| `jipsa attack` | 마감 전 반대 검토를 돌린다. 공급자는 설정에서 codex, claude, none 가운데 고른다 |
 | `jipsa runs`, `jipsa result` | 지난 작업 목록과 결과지 전문 |
 | `jipsa status`, `jipsa report` | 지금 상태와 오늘 보고 |
-| `jipsa check` | 환경 점검 |
+| `jipsa check` | 환경 점검. Codex는 선택 항목이라 없어도 종료 코드에 영향이 없다 |
+| `python monitor.py` | 콘솔 Monitor. 대시보드와 스케줄러를 한 단축키로 함께 켜고, 끄고, 다시 켠다 |
 
 ## 폴더
 

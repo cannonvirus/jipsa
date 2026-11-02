@@ -1,11 +1,11 @@
 ---
 name: jipsa-model
-description: 모델 설정. 사용자가 "/jipsa-model", "/jipsa-model show", "작업자 모델 바꿔 줘"라고 하면 작업자 모델, 가벼운 호출 모델, Codex 모델을 질문으로 받아 jipsa settings 명령으로 쓴다.
+description: 모델 설정. 사용자가 "/jipsa-model", "/jipsa-model show", "작업자 모델 바꿔 줘"라고 하면 작업자 모델, 가벼운 호출 모델, Codex 모델, 마감 전 공격 공급자를 질문으로 받아 jipsa settings 명령으로 쓴다.
 ---
 
 # jipsa-model
 
-모델을 질문 4개로 받는다. 인자는 없거나 `show`(`보기`)다. `show`는 `uv run jipsa settings show --skill model` 출력만 보이고 묻지 않는다. 모델 이름은 고유 명칭이라 영어 그대로 받고 번역하지 않는다.
+모델과 공격 공급자를 질문 5개로 받는다. 인자는 없거나 `show`(`보기`)다. `show`는 `uv run jipsa settings show --skill model` 출력만 보이고 묻지 않는다. 모델 이름은 고유 명칭이라 영어 그대로 받고 번역하지 않는다.
 
 ## 같이 지키는 규칙
 
@@ -25,6 +25,7 @@ description: 모델 설정. 사용자가 "/jipsa-model", "/jipsa-model show", "�
 2. 판정과 요약 같은 짧은 호출에 쓰는 모델은? 모델 이름 그대로다. 키는 `JIPSA_MODEL_FAST`다.
 3. 결과 분석과 반대 검토에 쓰는 Codex 모델은? 키는 `JIPSA_CODEX_MODEL`이다.
 4. Codex 작업자 모델은? 비우면 분석자 모델과 같다. 키는 `JIPSA_CODEX_WORKER_MODEL`이다.
+5. 마감 전 반대 검토(공격)를 어디에 맡길까? codex, claude, none 가운데 하나이고 기본은 codex다. 키는 `JIPSA_ATTACK_PROVIDER`다. 답하기 전에 세 값을 풀어 준다: codex는 Codex가 하고 Codex 실행 파일이 없으면 공격 없이 돈다(Claude가 대신 공격하지 않는다). claude는 작업자와 같은 계열 모델이 읽기 전용, 도구와 웹 없음으로 새 호출 한 번을 하고 결과지에 "같은 공급자 공격"이라고 적힌다. none은 부르지 않는다. claude는 사람이 직접 고른 경우에만 쓴다. 사람이 고르지 않았으면 codex를 그대로 둔다.
 
 답마다 `uv run jipsa settings check '<키>=<값>'`로 검사한다.
 

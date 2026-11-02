@@ -287,7 +287,7 @@ def codex_window_state(runs: list[dict]) -> dict:
     """Codex 창. 환경 불 줄의 Codex 불과 옆 글자, 화면에 든 실행의 Claude 전환 횟수다."""
     w = codex_window.with_usage(codex_window.window())  # 실행 기록의 실측 비율이 있으면 화면 글자는 그것이 먼저다
     switches = sum(1 for m in runs for s in m.get("provider_switches") or [] if s.get("to") == codex_window.CLAUDE)
-    return {**w, "text": codex_window.env_text(w), "switches": switches}
+    return {**w, "text": codex_window.env_text(w), "switches": switches, "shown": codex_window.codex_shown()}
 
 
 def web_stamp() -> str:
@@ -633,7 +633,7 @@ def head_line(metas: list[dict]) -> dict:
                      "five_reset": (cw.get("five_reset_iso") if measured else cw.get("reset_iso")) or "", "week_reset": cw.get("week_reset_iso") or "",
                      "cleared": bool(cw.get("five_cleared")), "week_cleared": bool(cw.get("week_cleared")), "measured": measured,
                      "fresh": not measured or (seen is not None and now() - seen <= timedelta(hours=1)), "seen": cw.get("usage_seen"),
-                     "calls": cw.get("calls"), "cap": cw.get("cap")},
+                     "calls": cw.get("calls"), "cap": cw.get("cap"), "hidden": not cw.get("shown", True)},
            "gpu": {"used": res.get("gpu_used_gb"), "total": res.get("gpu_total_gb"), "ok": bool(res.get("gpu_ok"))},
            "ram": {"used": round(ram_total - ram_free, 1) if ram_total and ram_free is not None else None, "total": ram_total},
            "ollama": res.get("ollama"), "alerts": alerts,

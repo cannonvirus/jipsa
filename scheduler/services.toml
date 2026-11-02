@@ -1,0 +1,21 @@
+# Monitor(저장소 루트의 python monitor.py)가 켜고 끄는 서비스 목록. 서비스를 더하거나 포트를 바꾸면 이 파일만 고친다.
+# kind는 켜고 끄는 방법이다. scheduler는 잠금과 대시보드 감시를 따르고, dashboard는 jipsa web을 띄운다.
+# group이 같은 서비스는 Monitor에서 하나의 단축키로 함께 끄고, 켜고, 다시 켠다. [[group]]은 묶음의 이름과 화면 글자다.
+# 시험에서는 JIPSA_SERVICES에 다른 파일을 주어 포트와 데이터 폴더를 바꾼다.
+
+[[group]]
+name = "core"
+label = "대시보드와 스케줄러"
+
+[[service]]
+name = "scheduler"
+label = "스케줄러"
+kind = "scheduler"
+group = "core"
+
+[[service]]
+name = "dashboard"
+label = "대시보드"
+kind = "dashboard"
+port = 8765
+group = "core"

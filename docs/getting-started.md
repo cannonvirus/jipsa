@@ -20,6 +20,12 @@ claude
 
 Claude Code CLI가 경로에 있어야 세션과 작업자가 돈다. Codex CLI는 없으면 Codex 관련 기능(분석자, Codex 작업자, Codex 창 표시)만 빠진다.
 
+## Monitor와 반대 검토 공급자
+
+`python monitor.py`는 대시보드와 스케줄러를 보여 주는 콘솔 메뉴다. 위쪽에 서비스마다 상태, PID, 포트, 주소가 나오고, 대시보드와 스케줄러는 단축키 하나로 함께 켜기, 끄기, 다시 켜기를 한다. 끄면 대시보드 감시가 스케줄러를 다시 띄우지 않고, 켜면 그 멈춤이 풀린다. 실행 중 작업이 있으면 끄기와 다시 켜기는 거절하며 y로 답하면 작업을 끊고 한다. 서비스는 창 없는 프로세스라 Monitor 창을 닫아도 돈다. 서비스 목록은 `scheduler/services.toml`이다.
+
+마감 전 반대 검토는 `/jipsa-model`의 마감 전 공격 공급자(`JIPSA_ATTACK_PROVIDER`)로 고른다. 기본은 `codex`이고 Codex CLI가 없으면 `none`과 같게 돌아 검토 없이 마감한다. `claude`는 작업자와 같은 계열 모델이 도구와 웹 없이 한 번 검토하며 결과지에 같은 공급자 공격이라고 적힌다. 공급자가 `codex`가 아니거나 Codex가 없으면 사용 창 표시의 Codex 칸이 숨겨지고, `jipsa check`의 codex 줄은 선택 항목으로 나온다.
+
 ## 임시 폴더로 화면 보기
 
 실제 상태 폴더를 쓰지 않고 화면만 보려면 임시 폴더를 환경 변수로 준다. 등록부는 이 저장소의 `projects/`를 그대로 읽는다. PowerShell 예다.
@@ -57,7 +63,7 @@ Auto 모드는 없어졌다. `uv run jipsa auto`는 없어졌다는 안내와 �
 | --- | --- |
 | `/jipsa-register` | 프로젝트 등록 만들기, 고치기(`edit`), 보기(`show`) |
 | `/jipsa-slack` | Webhook 주소, 시험 글(`test`), 아침 요약 시각, 알림 켜짐 |
-| `/jipsa-model` | 작업자 모델, 가벼운 호출 모델, Codex 모델, Codex 멈춤 비율과 다시 쓰는 비율 |
+| `/jipsa-model` | 작업자 모델, 가벼운 호출 모델, Codex 모델, 마감 전 공격 공급자 |
 | `/jipsa-config` | 동시 작업 수, 자동 작업 동시 수, Ollama 주소, 자료 폴더, 되돌리기(`undo`) |
 | `/jipsa-cleanup` | 기록 보관 기한 셋, 중간 산출물 정리 |
 

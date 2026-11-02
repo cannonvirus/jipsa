@@ -1012,7 +1012,8 @@ def window_view(at: datetime | None = None) -> dict:
     at = at or now()
     w = codex_window.window(at)
     measured = w["state"] == codex_window.LIMIT or w.get("source") != "어림"
-    return {"claude": claude_window.usage(at)["text"], "codex": codex_window.env_text(w) if measured else "Codex 창 실측 없음"}
+    codex = (codex_window.env_text(w) if measured else "Codex 창 실측 없음") if codex_window.codex_shown() else ""  # 공급자가 codex가 아니거나 Codex가 없으면 칸을 숨긴다
+    return {"claude": claude_window.usage(at)["text"], "codex": codex}
 
 
 # ----- 진행 -----

@@ -36,6 +36,7 @@ ITEMS: list[dict] = [
     I(key="JIPSA_MODEL_WORKER", group="model", name="작업자 모델", desc="Claude 작업자가 쓰는 모델이고 첫 실행 때 정해야 돈다.", kind="str", default="opus", options=["opus", "sonnet", "haiku"]),
     I(key="JIPSA_MODEL_FAST", group="model", name="가벼운 호출 모델", desc="판정, 요약 같은 짧은 호출에 쓰는 모델이다.", kind="str", default="claude-haiku-5-5"),
     I(key="JIPSA_CODEX_MODEL", group="model", name="분석자 모델(Codex)", desc="결과 분석과 마감 전 반대 검토에 쓰는 Codex 모델이다.", kind="str", default="gpt-6.1-sol"),
+    I(key="JIPSA_ATTACK_PROVIDER", group="model", name="마감 전 공격 공급자", desc="마감 전 반대 검토를 어디에 맡길지다. codex는 Codex가 하고 실행 파일이 없으면 공격 없이 돈다(Claude가 대신 공격하지 않는다). claude는 같은 계열 모델이 새 호출 한 번으로 하고 결과지에 같은 공급자 공격이라고 적는다. none은 부르지 않는다. 기본 codex를 바꾸지 않으면 Codex가 없어도 Claude가 대신 공격하지 않는다.", kind="str", default="codex", options=["codex", "claude", "none"]),
     I(key="JIPSA_CODEX_WORKER_MODEL", group="model", name="Codex 작업자 모델", desc="등록이 Codex 작업자를 고른 프로젝트에 쓰는 모델이고 비우면 분석자 모델과 같다.", kind="str", default="", note="비움(분석자 모델과 같음)"),
     I(key="JIPSA_RETAIN_RUN_DAYS", group="cleanup", name="실행 기록 보관 기한", desc="실행 기록을 월별 보관함으로 옮기기까지 두는 일수다.", kind="int", default="30", unit="일"),
     I(key="JIPSA_RETAIN_OTHER_DAYS", group="cleanup", name="세션 기록 보관 기한", desc="세션 기록과 일회성 폴더를 월별 보관함으로 옮기기까지 두는 일수다.", kind="int", default="14", unit="일"),
@@ -276,15 +277,15 @@ def restart(force: bool = False, port: int = 0) -> dict:
     import sys
     import time
 
-    from scheduler import procs as proctools, supervise
+    from scheduler import monitor, supervise
     from scheduler.nowindow import BACKGROUND, BREAKAWAY, hidden
 
     brief = _scheduler_brief()
     if brief["running"] and not force:
         return {"ok": False, "why": f"실행 중 작업이 {brief['running']}개 있다. 끝나기를 기다리거나 --force를 준다. --force는 그 작업을 끊는다", "running": brief["running"]}
     port = port or WEB_PORT
-    listener = proctools._listener(port)
-    if listener and not proctools._is_dashboard(listener):
+    listener = monitor._listener(port)
+    if listener and not monitor._is_dashboard(listener):
         return {"ok": False, "why": f"{port} 포트를 다른 프로그램이 쓴다. 다시 띄우지 않았다"}
     dash_pid = listener.pid if listener else 0
     supervise.unhold()
@@ -304,8 +305,8 @@ def restart(force: bool = False, port: int = 0) -> dict:
         return {"ok": False, "why": f"다시 시작 도우미를 띄우지 못했다: {e}"}
     while time.monotonic() - started < 45:  # 옛 대시보드가 내려가고 새 대시보드가 응답할 때까지 본다
         time.sleep(1)
-        now_listener = proctools._listener(port)
-        if now_listener and now_listener.pid != dash_pid and proctools._responds(port):
+        now_listener = monitor._listener(port)
+        if now_listener and now_listener.pid != dash_pid and monitor._responds(port):
             return {"ok": True, "text": f"스케줄러와 대시보드를 창 없이 다시 띄웠다({round(time.monotonic() - started)}초). 포트 {port}이고 스케줄러는 대시보드 감시가 띄운다", "port": port}
     return {"ok": False, "why": f"45초 안에 {port} 포트 대시보드가 응답하지 않았다. 상태 폴더 restart.log를 본다"}
 
@@ -317,7 +318,7 @@ def _restart_main(argv: list[str]) -> int:
     import sys
     import time
 
-    from scheduler import procs as proctools
+    from scheduler import monitor
 
     ap = argparse.ArgumentParser()
     ap.add_argument("action")
@@ -334,7 +335,7 @@ def _restart_main(argv: list[str]) -> int:
 
     say(f"다시 시작 요청. 포트 {a.port}, 대시보드 pid {a.dash_pid}, 스케줄러 pid {a.sched_pid}")
     time.sleep(1.0)  # 대시보드가 응답을 다 보내게 둔다
-    # 이 도우미는 대시보드의 자식이므로 자식까지 끄는 방식을 쓰면 자기도 죽는다. 가상환경의 python.exe는 실제 python을
+    # 이 도우미는 대시보드의 자식이므로 monitor._kill(자식까지 끈다)을 그대로 쓰면 자기도 죽는다. 가상환경의 python.exe는 실제 python을
     # 자식으로 띄우는 실행기라 그 실행기(내 부모)를 끄면 나도 죽으므로, 나와 내 조상은 모두 뺀다
     import psutil
 
@@ -346,7 +347,7 @@ def _restart_main(argv: list[str]) -> int:
         mine.add(q.pid)
     procs = []
     for pid in (a.sched_pid, a.dash_pid):
-        p = proctools._proc(pid) if pid else None
+        p = monitor._proc(pid) if pid else None
         if p:
             try:
                 procs += [p, *p.children(recursive=True)]
@@ -366,11 +367,11 @@ def _restart_main(argv: list[str]) -> int:
             pass
     say(f"껐다. pid {[p.pid for p in procs]}")
     for _ in range(30):
-        if proctools._listener(a.port) is None:
+        if monitor._listener(a.port) is None:
             break
         time.sleep(0.5)
-    proc = proctools._popen([sys.executable, "-m", "scheduler.cli", "web", "--no-open", "--port", str(a.port)], proctools.DASH_LOG, ROOT)
-    ok = proctools._wait_until(lambda: proctools._responds(a.port) or proc.poll() is not None, 30) and proctools._responds(a.port)
+    proc = monitor._popen([sys.executable, "-m", "scheduler.cli", "web", "--no-open", "--port", str(a.port)], monitor.DASH_LOG, ROOT)
+    ok = monitor._wait_until(lambda: monitor._responds(a.port) or proc.poll() is not None, 30) and monitor._responds(a.port)
     say(f"대시보드 다시 띄움 pid {proc.pid}, 응답 {'있음' if ok else '없음'}. 스케줄러는 대시보드 감시가 띄운다")
     return 0 if ok else 1
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -27,6 +28,28 @@ KEEP = timedelta(hours=6)  # 장부 정리 기준
 FREE, LIMIT = "여유", "한도"
 CLAUDE, CODEX = "claude", "codex"
 PROVIDERS = (CLAUDE, CODEX)
+ATTACK_PROVIDERS = ("codex", "claude", "none")
+
+
+def attack_provider() -> str:
+    """공격 공급자 설정값(261103-jipsa-02 사용자 답 1안). 기본은 codex이고 모르는 값도 codex로 본다."""
+    value = setting("JIPSA_ATTACK_PROVIDER", "codex").lower()
+    return value if value in ATTACK_PROVIDERS else "codex"
+
+
+def codex_installed() -> bool:
+    return shutil.which("codex") is not None
+
+
+def effective_attack_provider() -> str:
+    """실제로 도는 공격 공급자. codex를 골랐는데 실행 파일이 없으면 none과 같게 돈다(Claude가 대신 공격하지 않는다)."""
+    p = attack_provider()
+    return "none" if p == "codex" and not codex_installed() else p
+
+
+def codex_shown() -> bool:
+    """사용 창 표시에 Codex 칸을 보일지. 공급자가 codex가 아니거나 실행 파일이 없으면 숨긴다."""
+    return attack_provider() == "codex" and codex_installed()
 
 LEDGER = STATE / "codex_calls.jsonl"
 _lock = threading.Lock()

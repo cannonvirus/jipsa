@@ -106,7 +106,7 @@ def cmd_status(args) -> int:
     _print(f"할 일 파일: 할 일 {len(rows_t)}줄, "
            f"메모 {memo_n}줄" + (f", 읽지 못한 줄 {len(bad_t)}" if bad_t else "") + " (jipsa todo)")
     g = cycle.window_view()
-    _print(f"사용 창(표시만, 새 시작을 막지 않는다): {g['claude']} | {g['codex']}")
+    _print(f"사용 창(표시만, 새 시작을 막지 않는다): {g['claude']}" + (f" | {g['codex']}" if g["codex"] else ""))
     s = resources.summary()
     gpu = f"GPU {s['gpu_used_gb']}/{s['gpu_total_gb']}GB" if s["gpu_ok"] else "GPU 측정 불가"
     ram = (s.get("ledger") or {}).get("ram") or {}
@@ -719,7 +719,7 @@ def cmd_claude_usage(args) -> int:
     u = claude_window.usage()
     g = cycle.window_view()
     _print(f"{u['text']}{' (' + u['source'] + ', ' + str(u['seen'])[11:16] + ' 기록)' if u['fresh'] else ''}")
-    _print(f"{g['codex']} (사용 창은 표시만 하고 새 시작을 막지 않는다)")
+    _print(f"{g['codex']} (사용 창은 표시만 하고 새 시작을 막지 않는다)" if g["codex"] else "Codex 칸은 숨겼다(공격 공급자가 codex가 아니거나 Codex가 없다)")
     return 0
 
 
@@ -1298,15 +1298,15 @@ def cmd_check(args) -> int:
 
     ok = True
 
-    def line(label: str, good: bool, detail: str = "") -> None:
+    def line(label: str, good: bool, detail: str = "", optional: bool = False) -> None:
         nonlocal ok
-        ok = ok and good
-        _print(f"  [{'OK' if good else '확인'}] {label} {detail}")
+        ok = ok and (good or optional)  # 선택 항목은 없어도 종료 코드에 영향을 주지 않는다
+        _print(f"  [{'OK' if good else '선택' if optional else '확인'}] {label} {detail}")
 
     _print("jipsa 점검")
     for tool in ("claude", "codex", "uv", "git", "nvidia-smi"):
         path = shutil.which(tool)
-        line(tool, bool(path), path or "없음")
+        line(tool, bool(path), path or ("없음" if tool != "codex" else "없음. 선택 항목이고 공격 공급자 codex는 none과 같게 돈다"), optional=tool == "codex")
     line("RULES.md", RULES_FILE.exists())
     line("AGENTS.md(RULES.md 사본)", AGENTS_FILE.exists(), "" if AGENTS_FILE.exists() else "jipsa sync-agents로 만든다")
     line("policies/claude_settings.json", SETTINGS_FILE.exists())
@@ -1337,7 +1337,7 @@ def cmd_check(args) -> int:
             t = codex.ask("한 단어로 답한다: 준비", timeout=180)
             line("Codex 호출", True, t[:30])
         except AdapterError as e:
-            line("Codex 호출", False, str(e)[:120])
+            line("Codex 호출", False, str(e)[:120], optional=True)
     _print("끝" if ok else "확인할 항목이 있다")
     return 0 if ok else 1
 

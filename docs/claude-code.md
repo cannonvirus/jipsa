@@ -59,7 +59,7 @@ jipsa 자신을 등록해 worktree에서 돌리면 그 worktree가 프로젝트 
 | `/auto` | 없어진 Auto 명령 안내. `jipsa auto`를 돌려 안내와 지금 상태를 보인다 |
 | `/jipsa-register` | 프로젝트 등록 만들기, 고치기, 보기 |
 | `/jipsa-slack` | Slack Webhook 주소, 시험 글, 아침 요약 시각, 알림 켜짐 |
-| `/jipsa-model` | 작업자 모델, 가벼운 호출 모델, Codex 모델 |
+| `/jipsa-model` | 작업자 모델, 가벼운 호출 모델, Codex 모델, 마감 전 공격 공급자 |
 | `/jipsa-config` | 동시 작업 수, Ollama 주소, 자료 폴더, 설정 되돌리기 |
 | `/jipsa-cleanup` | 기록 보관 기한과 중간 산출물 정리 |
 

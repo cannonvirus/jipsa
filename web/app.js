@@ -641,7 +641,7 @@
     };
     usage("Claude", h.claude, []);
     const cx = h.codex || {};
-    usage("Codex", h.codex, [...(!cx.measured && cx.cap ? [`실측 없음, 호출 수 어림 ${cx.calls}/${cx.cap}회`] : []), ...(cx.handover ? ["Claude가 이어받는 중"] : [])]);
+    if (!cx.hidden) usage("Codex", h.codex, [...(!cx.measured && cx.cap ? [`실측 없음, 호출 수 어림 ${cx.calls}/${cx.cap}회`] : []), ...(cx.handover ? ["Claude가 이어받는 중"] : [])]);
     const res = (name, used, total, title) => {
       const ok = used != null && total;
       const g = group(name.toLowerCase(), name, ok ? `${title} ${used}/${total}GB, ${Math.round((used / total) * 100)}% 사용` : `${title} 측정 불가`);
