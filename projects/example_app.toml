@@ -1,0 +1,43 @@
+# 예시 등록부. 자기 저장소를 등록할 때 이 파일을 복사해 이름과 경로를 바꾼다. 형식 설명은 docs/registry.md다.
+name = "example_app"
+path = "~/code/example-app"
+kind = "code"
+priority = 50
+run_prefix = "uv run"
+
+[scope]
+auto = "기능 브랜치 커밋까지. 푸시 없음"
+commit = true
+notes = [
+  "src/와 docs/ 아래만 고친다",
+  "설정 파일은 읽기만 한다",
+]
+
+[paths]
+no_read = [".env"]
+read_only = ["config/", "CLAUDE.md", "AGENTS.md"]
+
+[paths.generated]
+# "docs/api.md" = "uv run python tools/gen_api.py"
+
+[links]
+dirs = [".venv"]
+
+[external]
+read = ["웹 조사"]
+forbid = ["git push", "릴리스 발행"]
+
+[resources]
+gpu_vram_gb = 0
+
+[limits]
+total_minutes = 90
+segment_minutes = 30
+
+[deps]
+manager = "uv-lock"
+lock_file = "uv.lock"
+venv = ".venv"
+
+[questions]
+items = []

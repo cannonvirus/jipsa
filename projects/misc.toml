@@ -1,0 +1,44 @@
+# 기타 등록부. 등록부 프로젝트에 속하지 않는 세션 일(PC 점검, 조사, 선정)을 실행 기록으로 남긴다. 화면 이름은 "기타"다.
+# 코드가 이 이름을 쓰므로 지우지 않는다. path의 "."는 jipsa 폴더다.
+name = "misc"
+path = "."
+kind = "doc"
+priority = 99
+run_prefix = "uv run"
+
+[scope]
+auto = "PC 점검, 조사, 선정처럼 등록부 프로젝트에 속하지 않는 읽기와 측정. 시스템 설정 변경, 설치, 전송 없음"
+commit = false
+manual_only = true
+allowed_dirs = ["runs/<실행ID>/"]
+notes = [
+  "세션이 jipsa begin misc 또는 jipsa record misc로만 기록한다. 스케줄러는 이 등록부를 자동 작업 대상으로 고르지 않는다(manual_only)",
+  "새 파일은 runs/ 아래 그 실행 폴더에만 만든다. 보고서는 attempt-1/report.md, 그림은 attempt-1/figures/다",
+  "jipsa 코드, 규칙, 다른 저장소는 고치지 않는다",
+]
+
+[paths]
+no_read = [".env", "runtime/"]
+read_only = ["RULES.md", "README.md", "AGENTS.md", "docs/", "policies/", "scheduler/", "web/", "adapters/", "notify/", "hooks/", "projects/", "reports/"]
+
+[links]
+dirs = []
+
+[external]
+read = ["웹 조사", "PC 상태 읽기(작업 관리자, 성능 카운터, 이벤트 로그)"]
+forbid = ["시스템 설정 변경", "프로그램 설치와 제거", "git push", "전송과 주문"]
+
+[resources]
+gpu_vram_gb = 0
+
+[limits]
+total_minutes = 60
+segment_minutes = 30
+
+[deps]
+manager = "uv-lock"
+lock_file = "uv.lock"
+venv = ".venv"
+
+[questions]
+items = []

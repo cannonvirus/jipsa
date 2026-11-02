@@ -1,0 +1,843 @@
+/* jipsa 대시보드, 야간 운영실 테마. 어두운 바탕과 금색 강조다.
+   화이트 모드가 기본이고 어두운 모드는 설정 메뉴에서 고른다(261102-jipsa-41). 기기 설정은 따르지 않는다. 바깥 글꼴을 불러오지 않는다. 색은 역할 토큰으로만 쓴다.
+   상태 색은 dataviz 검증기로 봤다. 금색 강조는 테마와 맞추느라 명도 띠보다 밝고, 나머지 항목은 통과한다. */
+/* 글꼴은 이 컴퓨터의 파일만 쓴다(web/fonts/README.md). Pretendard와 JetBrains Mono를 쓴다. */
+@font-face { font-family: "Pretendard Variable"; src: url("/fonts/PretendardVariable.woff2") format("woff2"); font-weight: 45 920; font-display: swap; }
+
+:root {
+  --font: "Pretendard Variable", Pretendard, "Malgun Gothic", "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", Consolas, "Cascadia Mono", "Fira Code", monospace;
+}
+/* 화이트 모드(기본, 261102-jipsa-41). 글자로 쓰는 색은 모두 --surface-2 위에서 4.5:1 이상이다. 기본값은 index.html 머리의 THEME_DEFAULT 한 곳이다 */
+:root, :root[data-theme="light"] {
+  color-scheme: light;
+  --plane: #ffffff;
+  --surface: #fbfaf7;
+  --surface-2: #f3f1ea;
+  --ink: #1d1b15;
+  --ink-2: #464238;
+  --muted: #625e52;
+  --grid: #dedad0;
+  --axis: #b5b0a0;
+  --ring: rgba(133, 95, 0, 0.28);
+  --acc: #855f00;
+  --run: #1d5cc0;
+  --analyze: #a2500a;
+  --search: #6d3dbd;
+  --good: #0c7350;
+  --warning: #855f00;
+  --critical: #bd2c1b;
+  --night: rgba(133, 95, 0, 0.07);
+  --live: #f2f6f0;
+  --dawn: #855f00;
+  --cue: #b04b0c;
+  --cue-edge: #ad4a00;
+  --cue-hi: #ad4a0c;
+  --on-cue: #ffffff;
+  --band-even: rgba(0, 0, 0, .025);
+  --lab-even: #f9f9f8;
+  --scrim: rgba(40, 35, 20, .35);
+  --shadow: rgba(40, 35, 20, .22);
+  --off-bg: #bd2c1b;
+  --off-ink: #ffffff;
+  --off-knob: rgba(255, 255, 255, .4);
+  --gseg-out: #8d8d8d;
+  --gseg-rsv: #a87a14;
+}
+/* 어두운 모드: 야간 운영실 테마 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane: #1a170f;
+  --surface: #211d13;
+  --surface-2: #27221a;
+  --ink: #eceae5;
+  --ink-2: #b7b09f;
+  --muted: #9a927f; /* 흐린 글자 대비 5.8:1(261029-jipsa-42 우선순위 1). 전에는 #7c7566(3.9:1)이었다 */
+  --grid: #3a3426;
+  --axis: #4a4432;
+  --ring: rgba(238, 195, 94, 0.28);
+  --acc: #eec35e;
+  --run: #7fb0ff;
+  --analyze: #f0a35a;
+  --search: #c6a4f5;
+  --good: #63c8a3;
+  --warning: #eec35e;
+  --critical: #ff7f6e;
+  --night: rgba(238, 195, 94, 0.07);
+  --live: #20231f;
+  --dawn: #eec35e;
+  --cue: #b54f10; /* --on-cue 글자 대비 4.6:1. 전에는 #c85a14(3.9:1)였다 */
+  --cue-edge: #ff9a3c;
+  --cue-hi: #e8732e;
+  --on-cue: #fff3e6;
+  --band-even: rgba(255, 255, 255, .03);
+  --lab-even: #201d16;
+  --scrim: rgba(0, 0, 0, .5);
+  --shadow: rgba(0, 0, 0, .45);
+  --off-bg: #e0654f;
+  --off-ink: #1a1a1a;
+  --off-knob: rgba(0, 0, 0, .35);
+  --gseg-out: #6b6b6b;
+  --gseg-rsv: #d9a441;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--plane); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.5; word-break: keep-all; }
+h2 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: 0; }
+.muted { color: var(--muted); }
+a { color: var(--acc); }
+button, select, input[type="range"], input[type="text"] { font: inherit; color: inherit; }
+button { background: none; border: 1px solid var(--grid); border-radius: 0; padding: 4px 12px; cursor: pointer; color: var(--ink); }
+button:hover { border-color: var(--acc); color: var(--acc); }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, tr:focus-visible, a:focus-visible, text:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+select, input[type="text"] { background: var(--plane); border: 1px solid var(--grid); border-radius: 0; padding: 4px 8px; color: var(--ink); }
+::placeholder { color: var(--muted); opacity: 1; }
+.num, .mono { font-family: var(--mono); }
+
+/* 머리줄 한 줄(261029-jipsa-44, 42 초안 구역 1): 금색 로고 상자, 확인 필요와 진행 중 숫자, 지금 도는 일, 오른쪽에 동시 Cycle, 오늘 보고, 설정 ⋯.
+   옛 상태 줄을 합쳐 두 줄이 한 줄이 됐다. 새로고침 주기와 Slack 스위치는 설정 메뉴 안이다 */
+.top { display: flex; align-items: center; gap: 14px; padding: 12px 28px; border-bottom: 1px solid var(--grid); background: var(--plane); position: sticky; top: 0; z-index: 5; }
+.brand { background: var(--acc); color: var(--plane); font: 700 16px/1 var(--mono); padding: 8px 10px; letter-spacing: .02em; flex: none; }
+.top .right { margin-left: auto; display: flex; gap: 10px; align-items: center; flex: none; }
+button.primary { background: var(--acc); color: var(--plane); border-color: var(--acc); font-weight: 600; }
+button.primary:hover { color: var(--plane); filter: brightness(1.08); }
+button.primary.small { padding: 2px 10px; font-size: 12.5px; }
+.btn-more { font: 600 15px/1 var(--font); padding: 5px 9px; color: var(--ink-2); letter-spacing: 1px; }
+.btn-more[aria-expanded="true"] { border-color: var(--acc); color: var(--acc); }
+/* 설정 메뉴(구역 20): 새로고침 주기, Slack 알림 이름과 상태, GPU 대기. 폰에서는 동시 Cycle과 오늘 보고도 여기 든다 */
+.menu { position: fixed; right: 28px; top: 54px; z-index: 8; background: var(--surface-2); border: 1px solid var(--grid); min-width: 240px; padding: 6px 0; box-shadow: 0 8px 24px var(--shadow); }
+.menu .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 14px; font-size: 13px; }
+.menu .row + .row { border-top: 1px solid var(--grid); }
+.menu .row .k { color: var(--ink-2); }
+.menu .row.ph-only { display: none; }
+.menu select { font-size: 12.5px; padding: 2px 6px; }
+/* 화면 모드 버튼(261102-jipsa-47): 세로축으로 90도까지 돌아 옆면이 되었을 때 글자를 바꾸고 반대쪽 -90도에서 돌아온다. 90도 안쪽만 지나므로 글자가 거울상이 되지 않는다. 폭을 고정해 모드가 바뀌어도 위 줄이 밀리지 않는다 */
+.theme-flip { flex: none; min-width: 60px; font: 600 12.5px/1 var(--mono); padding: 6px 8px; text-align: center; background: var(--acc); border-color: var(--acc); color: var(--plane); }
+.theme-flip:hover { color: var(--plane); border-color: var(--ink); }
+.theme-flip.flipping { animation: theme-flip .2s linear; }
+@keyframes theme-flip { 0% { transform: perspective(160px) rotateY(0deg); } 50% { transform: perspective(160px) rotateY(90deg); } 50.01% { transform: perspective(160px) rotateY(-90deg); } 100% { transform: perspective(160px) rotateY(0deg); } }
+@media (prefers-reduced-motion: reduce) { .theme-flip.flipping { animation: none; } }
+.menu .link { border: 0; padding: 0; color: var(--acc); font-size: 12.5px; }
+/* 자원 줄(구역 2, 옛 머리 줄 한 줄 현황 261023-jipsa-41): 라벨은 한 색(흐린 글자)이고 색은 값에만 쓴다. 0~69% 초록, 70~89% 노랑, 90% 이상 빨강,
+   오래된 측정과 없는 값은 흐린 회색이다. 이상 경고(스케줄러 꺼짐 등)는 맨 앞 빨강 글자다. 자리가 모자라면 항목 단위로 줄을 바꾼다 */
+.res { padding: 6px 28px; border-bottom: 1px solid var(--grid); min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font: 12.5px/1.4 var(--mono); color: var(--muted); white-space: nowrap; }
+.res:empty { display: none; }
+.hl-g { display: inline-flex; align-items: baseline; gap: 5px; cursor: default; flex: none; }
+.hl-n { font-family: var(--font); font-size: 12px; color: var(--muted); }
+.hl-v { font-weight: 600; color: var(--ink); }
+/* 0~69%는 초록이다(261024-jipsa-01). 41에서 막대를 글자로 바꾸며 정상 구간 색 규칙이 빠져 모든 값이 글자색 한 색으로 보였다 */
+.hl-v.ok { color: var(--good); }
+.hl-v.warn { color: var(--warning); } .hl-v.crit { color: var(--critical); }
+.hl-v.stale, .hl-v.none, .hl-q { color: var(--muted); font-weight: 400; }
+.hl-sl { color: var(--muted); margin: 0 -2px; }
+.hl-sep { color: var(--muted); flex: none; margin: 0 1px; } /* ccstatusline처럼 항목 사이 | 구분자 */
+.hl-g.alert .hl-v { font-family: var(--font); font-size: 12.5px; }
+.hl-g.ollama .hl-v { color: var(--ink-2); font-weight: 400; }
+/* 모드 표시(261023-jipsa-42, 261024-jipsa-18): Manual은 파란 테두리와 파란 점, Auto는 초록 테두리와 깜박이는 초록 점이다. 금색 단추들과 섞이지 않게 한다 */
+.modepill { display: inline-flex; align-items: center; gap: 8px; font: 600 13px/1 var(--mono); border: 1px solid var(--grid); color: var(--ink-2); padding: 6px 10px; }
+.modepill.auto { border: 2px solid var(--good); color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); padding: 5px 9px; }
+.modepill.manual { border-color: var(--run); color: var(--run); } /* Manual도 켜진 색이다. 지난 기록 보기의 Manual은 예전처럼 회색이다(261024-jipsa-18) */
+.modepill.past { border-color: var(--grid); color: var(--ink-2); }
+.modepill.stop { border-color: var(--critical); color: var(--critical); } /* 동시 Cycle 상한 0(사용 창 문턱, 261029-jipsa-17) */
+.modepill.stop .dot { background: var(--critical); }
+.modepill:not(.past) { cursor: pointer; }
+.modepill .note { font-weight: 400; font-size: 11px; }
+.slacksw { display: inline-flex; align-items: center; gap: 8px; font: 600 12.5px/1 var(--mono); border: 1px solid var(--grid); background: transparent; color: var(--ink-2); padding: 5px 10px; cursor: pointer; }
+.slacksw .knob { width: 22px; height: 10px; border-radius: 6px; background: var(--grid); position: relative; }
+.slacksw .knob::after { content: ""; position: absolute; top: 1px; left: 1px; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-2); }
+.slacksw:disabled { cursor: default; }
+.slacksw:disabled .knob { opacity: .6; }
+.slacksw.on { border-color: var(--acc); color: var(--acc); }
+.slacksw.on .knob { background: var(--acc); }
+.slacksw.on .knob::after { left: 13px; background: var(--plane); }
+.slacksw.off { border-color: var(--off-bg); background: var(--off-bg); color: var(--off-ink); }
+.slacksw.off .knob { background: var(--off-knob); }
+.slacksw.off .knob::after { background: var(--off-ink); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.modepill.auto .dot { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 30%, transparent); animation: autoDot 1.6s ease-in-out infinite; }
+.modepill.manual .dot { background: var(--run); box-shadow: 0 0 0 3px color-mix(in srgb, var(--run) 30%, transparent); }
+@keyframes autoDot { 50% { opacity: .6; } } /* 깜박여도 꺼진 점으로 보이지 않게 한다 */
+@media (prefers-reduced-motion: reduce) { .modepill.auto .dot { animation: none; } }
+.counts { display: flex; gap: 8px 20px; flex-wrap: wrap; align-items: center; flex: 1 1 auto; min-width: 0; }
+.counts .chip { display: inline-flex; align-items: baseline; gap: 7px; font-size: 13px; color: var(--ink-2); }
+.counts .chip b { font: 700 20px/1 var(--mono); color: var(--ink); }
+.counts .chip.run b { color: var(--run); } .counts .chip.hold b { color: var(--cue-edge); } .counts .chip.done b { color: var(--good); } .counts .chip.fail b { color: var(--critical); }
+.counts .chip.zero, .counts .chip.zero b { color: var(--muted); }
+.seg { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--grid); padding: 3px 10px; }
+.seg input[type="radio"] { accent-color: var(--acc); margin: 0; }
+.seg select { border: 0; padding: 0; background-color: var(--plane); color: var(--ink); }
+select option { background-color: var(--surface); color: var(--ink); }
+@media (max-width: 900px) { .top { gap: 12px; padding: 10px 16px; } .counts { gap: 14px; } .res { padding: 5px 16px; } }
+
+.replay { display: flex; align-items: center; gap: 12px; padding: 8px 28px; border-bottom: 1px solid var(--grid); flex-wrap: wrap; }
+.replay input[type="range"] { flex: 1 1 200px; accent-color: var(--acc); }
+.vnow { font-family: var(--mono); min-width: 11ch; }
+
+/* 본문은 상자가 아니라 선으로 나눈 절이다 */
+main { padding: 0 28px 48px; display: flex; flex-direction: column; }
+.panel { padding: 18px 0 22px; border-bottom: 1px solid var(--grid); min-width: 0; }
+.sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.sec-head select { font: 12px var(--mono); }
+.tlfilter { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12.5px; }
+.tlfilter .seg { padding: 3px 10px; cursor: pointer; color: var(--ink); user-select: none; }
+/* 필터 칩이 범례를 겸한다(구역 8, 261029-jipsa-42 우선순위 7). 빈 체크박스 대신 색 점과 글자 진하기로 켜짐과 꺼짐을 가른다. 체크박스는 숨기고 값만 쓴다 */
+.tlfilter .seg input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.tlfilter .seg:not(:has(input:checked)) { color: var(--muted); border-style: dashed; }
+.tlfilter .seg:not(:has(input:checked)) .sw { opacity: .35; }
+.tlfilter .seg:has(input:focus-visible) { outline: 2px solid var(--acc); outline-offset: 2px; }
+.tlfilter .seg .sw { width: 9px; height: 9px; border-radius: 0; box-sizing: border-box; }
+.tlhelp { position: relative; display: inline-flex; align-items: center; }
+.tlhelp button { width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 12px; color: var(--ink-2); }
+.tlhelp button[aria-expanded="true"] { border-color: var(--acc); color: var(--acc); }
+.tlhelp-box { position: absolute; top: 28px; left: 0; z-index: 20; min-width: 300px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--axis); box-shadow: 0 6px 18px var(--shadow); display: flex; flex-direction: column; gap: 7px; color: var(--ink-2); font-size: 12px; }
+.tlhelp-box[hidden] { display: none; }
+@media (max-width: 700px) { .tlhelp-box { position: fixed; top: 120px; left: 12px; right: 12px; min-width: 0; max-height: 70vh; overflow-y: auto; } } /* tlhelp-box 작은 화면: 오른쪽이 잘리지 않게 창에 맞춘다 */
+.tlhelp-box div { display: flex; align-items: center; gap: 8px; }
+.tlhelp-box .sw { flex: none; }
+.sw { display: inline-block; width: 14px; height: 10px; }
+.sw-run { background: var(--run); } .sw-analyze { background: var(--analyze); } .sw-search { background: var(--search); }
+.sw-done { background: var(--good); } .sw-fail { background: var(--critical); } .sw-hold { background: var(--cue); }
+.sw-wait { background: none; border: 1.5px dashed var(--muted); }
+.sw-agent { height: 4px; background: var(--axis); }
+.sw-retry { width: auto; height: auto; font-size: 10px; font-weight: 700; color: var(--ink); border: 1.5px solid var(--ink-2); border-radius: 50%; padding: 0 4px; line-height: 13px; }
+.sw-dawn { width: 2px; height: 14px; background: var(--dawn); }
+.empty { color: var(--muted); margin: 6px 0 0; }
+@media (max-width: 900px) { main { padding: 0 16px 40px; } }
+
+/* 타임라인 */
+.tl { overflow-x: hidden; } /* 가로 스크롤은 두지 않는다: 그림이 폭에 맞춰 줄어든다 */
+@media (max-width: 800px) { .tl { overflow-x: auto; } } /* 반폭 보완(261029-jipsa-43): 좁은 창에서는 그림이 760px로 고정되므로 오른쪽 상태 칸이 잘리지 않게 그림 안에서만 가로 스크롤한다 */
+.tl svg { display: block; font-family: var(--font); }
+.tl .axis text { fill: var(--muted); font-size: 11px; font-family: var(--mono); }
+.tl .grid line { stroke: var(--grid); stroke-width: 1; }
+.tl .night { fill: var(--night); }
+.tl .dawn { stroke: var(--dawn); stroke-width: 1.5; }
+.tl .dawn-label { fill: var(--dawn); font-size: 11px; font-weight: 700; font-family: var(--mono); }
+.tl .nowline { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 3 3; }
+.tl .band { fill: transparent; }
+.tl .band.even { fill: var(--band-even); }
+.tl .row:hover .band { fill: var(--night); }
+.tl .lab-bg { fill: var(--plane); }
+.tl .lab-bg.even { fill: var(--lab-even); }
+.tl .row:hover .lab-bg { fill: var(--night); }
+.tl .cut-mark { fill: var(--plane); opacity: .85; pointer-events: none; }
+.tl .row-label { fill: var(--ink); font-size: 13px; cursor: pointer; }
+.tl .row-label:hover { fill: var(--acc); }
+.tl .row-label.sub { font-weight: 400; fill: var(--ink-2); font-size: 12px; }
+.tl .etc-arrow { fill: var(--ink); font-size: 11px; cursor: pointer; }
+.tl .etc-arrow:hover { fill: var(--acc); }
+.tl .row-sub { fill: var(--muted); font-size: 11px; font-family: var(--mono); }
+.tl .bar { stroke: none; cursor: pointer; }
+.tl .bar.run, .tl .bar.analyze, .tl .bar.search, .tl .bar.reply { fill: var(--run); } /* 진행 단계는 한 색이다. 단계 이름은 막대 툴팁에 있다 */
+.tl .bar:hover, .tl .bar:focus { filter: brightness(1.15); outline: none; }
+.tl .run.st-완료 .bar { fill: var(--good); }
+.tl .run.st-실패 .bar { fill: var(--critical); }
+.tl .run.hold .bar { fill: var(--cue); } /* 상태 값 확인 필요도 확인 필요 막대다. 답을 넣을 것은 툴팁과 상태 칸 물음표로 가른다 */
+.tl .run.hold.answered .bar { fill: none; stroke: var(--cue-edge); stroke-width: 1.5; stroke-dasharray: 3 2; } /* 답 들어감, 처리 대기 */
+.tl .run.st-건너뜀 .bar { fill: var(--muted); }
+.tl .bar-label { fill: var(--plane); font-size: 11px; pointer-events: none; font-weight: 600; }
+.tl .atk-label { fill: var(--plane); font-size: 9.5px; pointer-events: none; opacity: .85; }
+.tl .topic-sep { stroke: var(--plane); stroke-width: 2; pointer-events: none; }
+.tl .agent-mark { fill: var(--axis); cursor: pointer; }
+.tl .agent-mark.pulse { fill: var(--run); }
+.tl .seg-gap { stroke: var(--plane); stroke-width: 2; }
+.tl .wait { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.tl .retry circle { fill: var(--plane); stroke: var(--ink-2); stroke-width: 1.5; }
+.tl .retry text { fill: var(--ink); font-size: 10px; font-weight: 700; text-anchor: middle; }
+.tl .status { font-size: 12px; font-family: var(--mono); fill: var(--ink-2); }
+.tl .status .mark { font-weight: 700; }
+.tl .st-완료 .mark { fill: var(--good); } .tl .st-실패 .mark { fill: var(--critical); } .tl .st-확인\ 필요 .mark { fill: var(--cue-edge); }
+.tl .st-진행\ 중 .mark { fill: var(--run); } .tl .st-건너뜀 .mark, .tl .st-끝 .mark { fill: var(--muted); }
+.tl .pulse { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none !important; } }
+
+.stpill { font: 12px var(--mono); color: var(--ink-2); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.stpill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.stpill.완료::before { background: var(--good); } .stpill.실패::before { background: var(--critical); } .stpill.확인필요::before { background: var(--cue); } .stpill.진행중::before { background: var(--run); }
+.stpill.open::before { background: none; border: 1.5px solid var(--acc); } .stpill.open { color: var(--ink); }
+.stpill.wait::before { background: none; border: 1.5px solid var(--muted); }
+
+code { font-family: var(--mono); font-size: 0.92em; background: var(--night); padding: 0 4px; }
+
+.bars { display: flex; flex-direction: column; gap: 9px; font-size: 13px; }
+.bar-row { display: grid; grid-template-columns: 38px 1fr 92px; gap: 10px; align-items: center; }
+.bars .n { font-weight: 500; }
+.bars .track { height: 8px; background: var(--grid); overflow: hidden; }
+.bars .fill { height: 100%; background: var(--run); transition: width .4s; }
+.bars .fill.hot { background: var(--critical); }
+.bars .v { font: 12px var(--mono); color: var(--ink-2); text-align: right; white-space: nowrap; }
+
+.stpill.확인::before { background: var(--cue); }
+
+/* 보고서 서랍(구역 15~17): 본문 폭 720px, 원문 링크는 본문 끝, 확인 줄은 바닥 고정 */
+.scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 20; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(62vw, 1040px); min-width: min(100vw, 540px); background: var(--surface); border-left: 2px solid var(--acc); z-index: 21; display: flex; flex-direction: column; }
+.drawer-body { overflow-y: auto; flex: 1; min-height: 0; }
+.drawer .rawline { margin: 0; padding: 0 28px 28px; font-size: 12.5px; color: var(--muted); }
+.drawer .rawline a { color: var(--ink-2); }
+.drawer-foot { flex: none; border-top: 1px solid var(--grid); border-left: 3px solid var(--cue-edge); padding: 10px 24px; background: var(--live); }
+.drawer-foot.done { border-left-color: var(--grid); background: var(--surface); }
+.drawer-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--grid); flex: none; }
+.drawer-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.drawer-title .name { font-weight: 600; font-size: 15px; min-width: 0; overflow-wrap: anywhere; }
+/* 지시 글은 세 줄까지만 보이고 나머지는 접는다. 펼쳐도 화면 높이의 30%를 넘으면 지시 글 안에서 스크롤해 아래 답 칸과 본문 자리를 남긴다 */
+.drawer-title .name.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.drawer-title .name.open { display: block; max-height: 30vh; overflow-y: auto; padding-right: 6px; }
+.drawer-title .name-more { font-size: 12px; padding: 1px 8px; color: var(--ink-2); }
+.drawer-title .meta { color: var(--muted); font: 12px var(--mono); }
+.drawer-tools { margin-left: auto; display: flex; gap: 10px; align-items: center; white-space: nowrap; }
+.drawer-tools a { color: var(--ink-2); font-size: 13px; }
+.drawer-tools a.preview { color: var(--acc); }
+.drawer-tools .off { color: var(--muted); font-size: 12px; }
+/* 초안 표식(261031-jipsa-10): 서랍 머리, 현황판 최근 결과 줄, 오늘 끝난 일 표에서 초안 실행을 결과지와 가른다. 주소 없음(miss)은 주의 색이다 */
+.tag.draft { font: 11px var(--mono); color: var(--acc); border: 1px solid var(--acc); border-radius: 3px; padding: 0 5px; margin-left: 6px; white-space: nowrap; flex: none; vertical-align: 1px; }
+.tag.draft.miss { color: var(--cue-hi); border-color: var(--cue-hi); }
+table.rows td.lb .tag.draft { margin: 0 6px 0 0; }
+.answer { padding: 12px 24px; border-bottom: 1px solid var(--grid); background: var(--live); flex: none; max-height: 30vh; max-height: 30dvh; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; } /* 화면 높이 30%가 상한이고 넘치면 칸 안에서 스크롤한다 */
+.answer .t { font-weight: 600; margin-bottom: 6px; }
+.answer .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.answer .opts button:first-child { border-color: var(--acc); color: var(--ink); }
+.answer form { display: flex; flex-direction: column; gap: 6px; position: sticky; bottom: -12px; padding: 6px 0 12px; margin-bottom: -12px; background: var(--live); } /* 안이 길어 칸 안에서 스크롤해도 답 상자와 답 넣기 단추는 칸 아래에 붙어 보인다 */
+.answer textarea, .tf-band .fb textarea { width: 100%; box-sizing: border-box; font: inherit; line-height: 1.55; padding: 8px 10px; resize: none; overflow-y: auto; min-height: 3.6em; background: var(--plane); border: 1px solid var(--grid); color: var(--ink); }
+.answer textarea:focus, .tf-band .fb textarea:focus { outline: 1px solid var(--acc); }
+.answer .answer-row, .tf-band .fb .answer-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.answer .answer-hint, .tf-band .fb .answer-hint { color: var(--muted); font-size: 12px; margin-left: auto; }
+.answer .answer-count, .tf-band .fb .answer-count { color: var(--muted); font: 12px var(--mono); }
+.answer .opts.alts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; align-items: baseline; } /* 1안 단추와 안 내용 */
+.answer .alt-text { line-height: 1.5; }
+.answer .notes { margin-bottom: 8px; }
+.answer .notes-t { font-size: 0.9em; opacity: 0.8; margin-bottom: 2px; }
+.answer .notes ul { margin: 0; padding-left: 18px; line-height: 1.5; }
+.answer .notes-toggle { border: 0; padding: 2px 0; color: var(--ink-2); font-size: 13px; }
+.answer .notes-toggle::before { content: "+ "; color: var(--acc); }
+.answer .notes-toggle[aria-expanded="true"]::before { content: "- "; }
+.answer .opts.groups { display: flex; flex-direction: column; gap: 10px; flex-wrap: nowrap; } /* 묶음마다 단추 한 줄과 그 아래 안 내용 */
+.answer .opt-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.answer .opt-texts .alt-text { font-size: 0.95em; color: var(--ink-2); }
+.answer .opts button.on { background: color-mix(in srgb, var(--acc) 22%, transparent); border-color: var(--acc); color: var(--ink); }
+@media (max-width: 900px) { .answer { padding: 10px 16px; } .answer form { bottom: -10px; margin-bottom: -10px; padding-bottom: 10px; } .answer .answer-hint, .tf-band .fb .answer-hint { display: none; } .answer .opts.alts { gap: 6px 8px; } }
+.md { padding: 20px 28px 16px; max-width: 776px; line-height: 1.65; } /* 본문 폭 720px과 좌우 여백(구역 16, 42 초안 우선순위 15) */
+.md h1 { font-size: 20px; margin: 0 0 12px; color: var(--acc); }
+.md h2 { font-size: 15px; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--grid); }
+.md h3 { font-size: 14px; margin: 16px 0 6px; }
+.md p { margin: 0 0 10px; }
+.md ul, .md ol { margin: 0 0 10px; padding-left: 22px; }
+.md li { margin: 2px 0; }
+.md pre { background: var(--plane); padding: 10px 12px; overflow-x: auto; font-size: 12.5px; line-height: 1.45; }
+.md pre code { background: none; padding: 0; }
+.md table { border-collapse: collapse; margin: 8px 0 4px; font-size: 13px; }
+.md details.fold { margin: 18px 0 6px; border-top: 1px solid var(--grid); padding-top: 8px; }
+.md details.fold > summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.md details.fold table { font-size: 12px; }
+.md th, .md td { border: 1px solid var(--grid); padding: 4px 10px; text-align: left; vertical-align: top; }
+.md th { color: var(--muted); font-weight: 500; }
+.md aside.box { border: 1px solid var(--acc); padding: 10px 14px; margin: 12px 0 18px; }
+.md aside.box .label { font: 600 11px var(--mono); color: var(--acc); margin-bottom: 4px; }
+.md aside.box p { margin: 0 0 4px; }
+.md figure { margin: 12px 0 18px; }
+.md figure img { max-width: 100%; display: block; border: 1px solid var(--grid); background: #fff; }
+.md figcaption, .md .caption { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+.md .caption { margin-bottom: 14px; }
+/* 굵은 글씨 하이라이트: 핵심 수치와 판정이 눈에 먼저 들어오게 옅은 금색 배경을 깐다. 요약 상자의 줄 이름(한 일, 결과, 사람이 할 일)은 금색 글자만 쓴다 */
+.md strong { font-weight: 700; color: var(--acc); background: none; padding: 0; } /* 강조는 금색 글자만(261028-jipsa-02, 1안) */
+.md p.lead > strong:first-child { display: block; font-size: 13px; letter-spacing: .01em; margin: 14px 0 2px; padding-left: 8px; border-left: 3px solid var(--acc); line-height: 1.4; } /* 마침표로 끝나는 굵은 머리말 문단은 소제목 줄 */
+.md aside.box p > strong:first-child { background: none; color: var(--acc); padding: 0; }
+.md blockquote { margin: 0 0 10px; padding: 2px 12px; border-left: 3px solid var(--grid); color: var(--ink-2); }
+@media (max-width: 900px) { .drawer { width: 100vw; min-width: 0; } }
+
+.tip { position: fixed; z-index: 30; background: var(--ink); color: var(--plane); padding: 8px 10px; font-size: 12px; pointer-events: none; max-width: 320px; box-shadow: 0 4px 14px var(--shadow); }
+.tip b { font-weight: 600; }
+.tip .l { opacity: .8; }
+
+/* 확인 필요: 끝났는데 확인하지 않은 작업(옛 이름 확인 전 완료)은 막대를 주황(--cue)으로 칠한다. 실패는 빨강을 두고 주황 테두리를 두른다. 상태 값 확인 필요(답을 넣을 것)도 같은 주황 막대와 주황 개수다 */
+.tl .run.cue-unread.st-완료 .bar { fill: var(--cue); }
+.tl .run.cue-unread.st-실패 .bar { stroke: var(--cue-edge); stroke-width: 2.5; paint-order: stroke; }
+.tl .run.cue-unread.st-완료 .bar-label, .tl .run.hold .bar-label { fill: var(--on-cue); }
+.sw-cue { background: var(--cue); }
+.sw-cue-fail { background: var(--critical); border: 2px solid var(--cue-edge); height: 10px; }
+.tl .cue-count rect { fill: var(--cue); }
+.tl .cue-count text { fill: var(--on-cue); font: 700 11px var(--mono); pointer-events: none; }
+
+.pcyc .cyc-st { margin-top: 4px; font-size: 12px; }
+/* 결과지 확인 줄: 서랍 바닥 고정 줄 안이다(구역 17, 42 초안 우선순위 14). 본문이 길어도 첫 화면에 보인다. 답 들어감 메모(.confirm.done)는 본문 맨 위다 */
+.md .confirm { margin: 0 0 12px; padding: 10px 0 0; }
+.confirm .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.confirm .row[hidden] { display: none; }
+.confirm button.primary { background: var(--acc); color: var(--plane); border-color: var(--acc); font-weight: 600; padding: 6px 22px; }
+.confirm button.small { font-size: 12px; padding: 2px 10px; color: var(--muted); background: none; }
+.confirm .memo { color: var(--ink-2); margin-bottom: 8px; white-space: pre-wrap; }
+.drawer-foot .confirm .memo { font-size: 12.5px; margin-bottom: 6px; }
+.answer .answer-images { display: flex; flex-wrap: wrap; gap: 8px; } /* 붙인 그림 미리보기. 칸에는 [Image #N]만 들어간다 */
+.answer .pasted { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--grid); border-radius: 6px; background: var(--bg, transparent); }
+.answer .pasted img { display: block; max-height: 48px; max-width: 96px; border-radius: 3px; }
+.answer .pasted .tag { font: 12px var(--mono); color: var(--ink-2); }
+.answer .pasted button { border: 0; padding: 2px 4px; font-size: 12px; color: var(--ink-2); }
+.confirm .memo a.image-tag { font-family: var(--mono); }
+.confirm .muted { display: block; margin-top: 6px; font-size: 12px; }
+.confirm .muted:empty { display: none; }
+/* 하루 보고 완료 항목(구역 19, 42 초안 우선순위 6): 프로젝트, 결과 한 줄, 걸린 분이 보이고 지시문 전문과 분석, 토큰은 자세히로 접는다 */
+.md li.day { list-style: none; margin: 0 0 0 -22px; padding: 7px 0; border-bottom: 1px solid var(--grid); }
+.md li.day .l1 { display: flex; gap: 10px; align-items: baseline; }
+.md li.day .l1 .pj { font: 12.5px var(--mono); color: var(--muted); flex: none; }
+.md li.day .l1 .rs { flex: 1 1 auto; min-width: 0; }
+.md li.day .l1 .mn { margin-left: auto; color: var(--muted); font: 12px var(--mono); white-space: nowrap; flex: none; }
+.md li.day details { margin-top: 2px; font-size: 12.5px; color: var(--muted); }
+.md li.day summary { cursor: pointer; color: var(--acc); width: max-content; }
+.md li.day details p { margin: 4px 0 0; }
+.md li.day details ul { margin: 2px 0 0; padding-left: 18px; }
+
+/* 환경 칸 GPU 사용처 */
+.gpu-owners { margin: -2px 0 6px 18px; font-size: 12.5px; color: var(--ink-2); }
+.gpu-owners .go { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
+.gpu-owners .go.other, .gpu-owners .go.none { color: var(--muted); }
+.gpu-owners .v { font: 12px var(--mono); white-space: nowrap; }
+.go-more summary { cursor: pointer; color: var(--muted); padding: 1px 0; }
+
+.sw-goal { background: var(--acc); }
+.tl .row-label.goal-head { fill: var(--acc); font-weight: 600; }
+
+/* 목표 줄: 목표 cycle마다 한 줄. Cycle 수, 처음과 최고, 추이 선, 주체, 지금 위치 */
+.goals { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 10px; }
+.goals[hidden] { display: none; }
+.goal-row { display: grid; grid-template-columns: minmax(180px, 1.6fr) 70px minmax(150px, 1fr) 130px 120px minmax(140px, 1fr); align-items: center; gap: 12px;
+  padding: 6px 10px; border: 1px solid var(--grid); border-left: 3px solid var(--acc); font-size: 13px; }
+.goal-row.ended { border-left-color: var(--muted); }
+.goal-row.ended .g-name b, .goal-row.ended .g-n, .goal-row.ended .g-rec, .goal-row.ended .g-who, .goal-row.ended .goal-spark { opacity: .6; } /* 끝난 목표는 흐리게 */
+.goal-sep { display: flex; align-items: center; gap: 8px; margin: 4px 0 2px; font-size: 11px; color: var(--muted); }
+.goal-sep::after { content: ""; flex: 1; border-top: 1px dashed var(--muted); }
+.goal-row .g-end { font-style: normal; font-size: 11px; font-weight: 600; color: var(--ink-2); border: 1px solid var(--muted); padding: 0 6px; margin-right: 8px; white-space: nowrap; }
+.goal-row.paused { border-left-color: var(--cue-edge); }
+.goal-row .g-name b { color: var(--ink); font-weight: 600; } .goal-row .g-name span { color: var(--muted); margin-right: 6px; }
+.goal-row .g-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } /* 긴 제목은 한 줄 말줄임, 전체는 툴팁 */
+.goal-fold { text-align: left; padding: 6px 10px; border: 1px solid var(--grid); border-left: 3px solid var(--muted); background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.goal-fold:hover, .goal-fold:focus-visible { color: var(--ink-2); }
+.goal-row .g-n, .goal-row .g-rec, .goal-row .g-who { font-family: var(--mono); font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.goal-row .g-rec b { color: var(--ink); }
+.goal-row .g-state { font-size: 12px; color: var(--ink-2); }
+.goal-row .g-state.live { color: var(--run); } .goal-row .g-state.paused { color: var(--cue-edge); } .goal-row .g-state.ended { color: var(--muted); }
+.goal-row .g-state.cue { color: var(--cue-edge); font-weight: 600; } /* 종합 보고가 확인 필요다 */
+.tl .row-label.sub.final { font-weight: 600; }
+.goal-spark { width: 130px; height: 30px; display: block; }
+.goal-spark .ln { fill: none; stroke: var(--acc); stroke-width: 1.6; }
+.goal-spark .tg { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 2; }
+.goal-spark .pt { fill: var(--plane); stroke: var(--acc); stroke-width: 1.3; } .goal-spark .pt.adopt { fill: var(--acc); }
+@media (max-width: 900px) { .goal-row { grid-template-columns: 1fr 1fr; } }
+.goal-spark .lb { fill: var(--muted); font-size: 10px; }
+
+/* ----- 탭, 현황판, 확인 필요 큐(261023-jipsa-37 1~3안) ----- */
+.counts .chip.done.small b { font-size: 16px; }
+.counts .chip.hold b { color: var(--cue-hi); }
+.tabs { display: flex; gap: 2px; padding: 0 28px; border-bottom: 1px solid var(--grid); background: var(--plane); overflow-x: auto; scrollbar-width: none; }
+.tabs .tab { border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 10px 18px 10px; color: var(--ink-2); font-weight: 600; font-size: 14px; white-space: nowrap; background: none; }
+.tabs .tab:hover { color: var(--ink); }
+.tabs .tab.on { color: var(--ink); border-bottom-color: var(--acc); }
+.tabs .tab .n { font: 12px var(--mono); margin-left: 6px; padding: 0 6px; border-radius: 9px; background: var(--surface-2); color: var(--ink-2); }
+.tabs .tab .n.cue { background: var(--cue-hi); color: var(--plane); font-weight: 700; }
+.pane { padding-top: 16px; }
+.pane > .panel:first-child, .pane > .replay[hidden] + .panel { padding-top: 0; }
+
+/* 상태 기호 한 벌: 모양과 색을 같이 쓴다 */
+.st { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }
+.st i { width: 10px; height: 10px; display: inline-block; flex: none; }
+.st.run i { background: var(--run); border-radius: 50%; }
+.st.cue i { background: var(--cue-hi); transform: rotate(45deg); width: 9px; height: 9px; }
+.st.fail i { background: var(--critical); }
+.st.done i { border: 2px solid var(--good); border-radius: 50%; }
+.st.todo i { border: 1.5px solid var(--muted); border-radius: 50%; }
+.st.run { color: var(--run); } .st.cue { color: var(--cue-hi); } .st.fail { color: var(--critical); } .st.done { color: var(--good); } .st.todo { color: var(--ink-2); }
+
+/* 현황판. 확인 필요 띠(구역 4)는 1건 이상일 때만 보이고 띠 아래에 항목 목록(구역 10, 옛 확인 필요 탭)이 펼쳐진다(261029-jipsa-43 1안) */
+.attn-wrap { margin-bottom: 14px; }
+.attn { display: flex; gap: 10px; align-items: center; background: var(--cue-bg, rgba(232, 115, 46, .08)); border: 1px solid var(--cue-hi); padding: 8px 14px; font-size: 13.5px; }
+.attn .tt { min-width: 0; }
+.attn .tt b { color: var(--cue-hi); font-weight: 600; }
+.attn button { font-size: 12.5px; padding: 3px 10px; background: var(--surface-2); border-color: var(--axis); white-space: nowrap; }
+.attn button.acc { background: var(--acc); color: var(--plane); border-color: var(--acc); font-weight: 700; margin-left: auto; }
+.attn-wrap .cq { border: 1px solid var(--cue-hi); border-top: 0; padding: 0 14px; background: var(--surface); }
+.attn-wrap .cq li:last-child { border-bottom: 0; }
+/* 카드는 두 열이다(261029-jipsa-46). 태스크 한 줄 칸을 넓히려고 세 열 이상으로 늘리지 않고, 두 장이 340px보다 좁아지면 한 열로 접힌다 */
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(340px, calc(50% - 6px)), 1fr)); gap: 12px; }
+/* 카드(구역 5): 숫자 4칸 대신 미병합 한 줄이다. 강조 꾸밈은 뗐다(261031-jipsa-11, 사용자 지시): 윗변 색 띠, 귀퉁이 표식, 마우스 올림의 종이색 반전과 기울임, 전환 애니메이션이 없고 얇은 테두리 한 줄과 글자만 남는다.
+   카드 전용 색 변수(--card-bg, --card-ink 등)도 뗐다(261031-jipsa-12, 사용자 지시): 옛 반전 카드(261029-jipsa-43)가 마우스 올림에서 그 변수만 바꿔 한 카드를 종이색으로 뒤집었으므로,
+   카드와 그 안 글자는 테마 색 토큰을 바로 써서 진행 중, 확인 필요, 마우스 올림 어느 조건에서도 모든 카드가 같은 바탕색과 글자색이다 */
+.pc { background: var(--surface); color: var(--ink); border: 1px solid var(--grid); padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 9px; min-width: 0; position: relative;
+  clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 7px, 100% calc(100% - 7px), calc(100% - 7px) 100%, 7px 100%, 0 calc(100% - 7px), 0 7px); }
+.pc .lbl, .pc .muted, .pc .pl .k, .pc .pft { color: var(--muted); }
+.pc .pl .more .tt, .pc .pl .when, .pc .pcyc .cyc-s { color: var(--ink-2); }
+.pc .ph { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pc .pn { font-family: var(--mono); font-weight: 700; font-size: 15px; }
+.pc .pft { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--grid); font: 12.5px var(--mono); display: flex; gap: 14px; }
+.pc .pft b { color: var(--ink-2); font-weight: 600; }
+.pc .pft b.v-warn { color: var(--acc); }
+.pc .lbl { font-size: 11.5px; }
+/* 카드 절(261102-jipsa-16): 모든 카드가 같은 순서의 절이고 절마다 위 구분선과 이름 줄이 있다. 빈 절은 안내 한 줄이다 */
+.pc .psec { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--grid); min-width: 0; }
+.pc .psec.pcyc { flex-direction: row; gap: 12px; align-items: center; }
+.pc .pempty { font-size: 12.5px; }
+.sl li.none { color: var(--muted); font-size: 12.5px; }
+/* 카드 아래 두 열 표(구역 6, 7): 쉬는 프로젝트 한 줄 표와 오늘 끝난 일 최근 5건. 1000px 아래에서는 세로로 쌓인다(261029-jipsa-43 반폭 보완) */
+.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 18px; }
+.sec { min-width: 0; }
+.sec-h { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; }
+.sec-h h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.sec-h .n { font-size: 12.5px; color: var(--muted); }
+.sec-h .lnk, button.lnk { margin-left: auto; font-size: 12.5px; color: var(--acc); background: none; border: 0; padding: 0; }
+table.rows { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+table.rows td { padding: 5px 8px; border-bottom: 1px solid var(--grid); color: var(--ink-2); vertical-align: top; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.rows td.p { font-family: var(--mono); color: var(--ink); width: 140px; }
+table.rows td.n { font-family: var(--mono); text-align: right; width: 90px; }
+table.rows td.t { text-align: right; color: var(--muted); width: 80px; }
+table.rows td.tm { font-family: var(--mono); color: var(--muted); width: 60px; }
+table.rows td.lb { color: var(--ink); width: 180px; cursor: pointer; } table.rows td.lb:hover { color: var(--acc); }
+table.rows td.lb.fail { color: var(--critical); }
+table.rows td.sm { color: var(--ink-2); }
+table.rows td.note { color: var(--muted); font-size: 12.5px; white-space: normal; }
+@media (max-width: 1000px) { .cols2 { grid-template-columns: 1fr; } }
+/* 폰 폭: 요약 칸을 숨기고 고정 폭 칸을 줄여 표가 화면 안에 든다 */
+@media (max-width: 600px) { table.rows td.sm { display: none; } table.rows td.lb { width: auto; } table.rows td.p { width: 96px; } table.rows td.n { width: 72px; } table.rows td.t { width: 58px; } table.rows td.tm { width: 48px; } }
+.pcyc { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.pcyc[role="button"] { cursor: pointer; }
+.pcyc-t { min-width: 0; }
+.pcyc .cyc-t { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcyc .cyc-s { font-size: 12.5px; } .pcyc .cyc-s b { color: var(--good); }
+.pcyc .cyc-end { font-size: 12px; color: var(--cue-hi); } .pcyc .cyc-end.live { color: var(--run); } .pcyc .cyc-end.ended { color: var(--muted); }
+.pspark { flex: none; }
+.pspark .tg { stroke: var(--acc); stroke-dasharray: 3 3; }
+.pspark .ln { fill: none; stroke: var(--ink-2); stroke-width: 1.5; }
+.pspark .pt { fill: var(--ink-2); } .pspark .pt.hit { fill: var(--good); } .pspark .pt.drop { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.5; }
+.pspark .lb { fill: var(--muted); font-size: 11px; }
+.pl { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.pl li { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.pl li[role="button"] { cursor: pointer; } .pl li[role="button"]:hover .tt { color: var(--acc); }
+.pl .k { color: var(--muted); font-size: 12px; width: 44px; flex: none; }
+.pl .q .st { width: 70px; flex: none; }
+.pl .q.rc .when { margin-left: auto; flex: none; } /* 최근 결과 줄의 끝난 때(261031-jipsa-08) */
+.pl .q.rc.child { padding-left: 18px; } /* 다른 실행의 답으로 시작한 실행은 부모 아래 들여 쓴다 */
+.pl .q.rc.child .tt::before { content: "↳ "; color: var(--muted); }
+.pl .more .tt { color: var(--ink-2); font-size: 12px; }
+.pl .tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pl .when { margin-left: auto; font-size: 11.5px; flex: none; }
+/* 카드의 단계 세 줄(261029-jipsa-47): 빨간 원 끝난 단계, 초록 원 지금 단계, 회색 원 다음 단계. 진행 중 실행마다 한 묶음이고 줄 높이를 고정해 비어도 자리가 같다 */
+.pc .sl { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; min-width: 0; }
+.sl .pl { gap: 6px; }
+/* 묶음 윗줄(261031-jipsa-06, 05 답 2안): 진행 중 실행마다 묶음(.sg)이고 윗줄(.sh)에 상태 칩과 제목 20자가 있다. 넓은 폭에서는 묶음이 가로로 나란히 놓인다. 실행이 없으면 윗줄 없이 -- 세 줄 하나다.
+   묶음을 감싸던 둥근 상자(배경과 테두리)는 뗐고(261031-jipsa-11, 사용자 지시) 윗줄 아래 단계 세 줄을 들여 써서 묶음을 보인다 */
+.sl .sg { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sl .sg[role="button"] { cursor: pointer; } .sl .sg[role="button"]:hover .stt { color: var(--acc); }
+.sl .sg .sh + .pl { padding-left: 17px; }
+.sl .sh { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sl .sh .st { flex: none; font-size: 11px; }
+.sl .sh .stt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; font-size: 12.5px; color: var(--ink-2); }
+.sl li { align-items: center; min-height: 20px; }
+.sl .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.sl .done .dot { background: var(--critical); } .sl .now .dot { background: var(--good); } .sl .next .dot { background: var(--muted); }
+.sl .now .tt:not(.muted) { color: var(--ink); }
+.board-idle { font-size: 12.5px; margin: 14px 0 0; }
+
+/* 확인 필요 큐 */
+.cq { list-style: none; margin: 0; padding: 0; }
+.cq li { display: grid; grid-template-columns: 96px 130px minmax(0, 1fr) 80px auto; gap: 12px; align-items: center; padding: 8px 4px; border-bottom: 1px solid var(--grid); font-size: 13.5px; cursor: pointer; }
+.cq li:hover { background: var(--surface); }
+.cq .pj { color: var(--ink); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cq .tt { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cq .tt .tsub { color: var(--muted); font-size: 12px; margin-left: 10px; }
+.cq .when { font-size: 11.5px; text-align: right; }
+.cq button { font-size: 12.5px; padding: 3px 12px; background: var(--surface-2); border-color: var(--axis); }
+.cq button.acc { background: var(--acc); color: var(--plane); border-color: var(--acc); font-weight: 700; }
+.cuepanel + .cuepanel { margin-top: 8px; }
+
+@media (max-width: 900px) {
+  .tabs { padding: 0 8px; }
+  .tabs .tab { padding: 9px 10px; font-size: 13px; }
+  .board { grid-template-columns: 1fr; }
+  .attn { flex-wrap: wrap; }
+  .attn .tt { flex-basis: 100%; order: 1; } .attn .st { order: 0; } .attn button { order: 2; }
+  .attn button.acc { margin-left: 0; }
+  .attn-wrap .cq { padding: 0 8px; }
+  .cq li { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "st pj btn" "tt tt tt"; row-gap: 4px; }
+  .cq li .st { grid-area: st; } .cq li .pj { grid-area: pj; } .cq li .tt { grid-area: tt; white-space: normal; } .cq li button { grid-area: btn; } .cq li .when { display: none; }
+}
+
+/* ----- 대시보드 개편 2(261023-jipsa-38 4~8안) ----- */
+/* 8안 상태 표기 한 벌: 완료 초록 고리, 진행 중 파랑 원, 확인 필요 주황 마름모, 실패 빨강 네모, 대기 회색 고리, 멈춤 노랑 두 막대.
+   현황판과 확인 필요 큐의 .st, TODO와 서랍의 .stpill, 타임라인 오른쪽 칸의 .sh가 같은 모양과 색이다 */
+.st.stop i { width: 10px; height: 10px; background: linear-gradient(90deg, var(--warning) 0 3px, transparent 3px 7px, var(--warning) 7px 10px); }
+.st.stop { color: var(--warning); }
+.stpill::before { width: 9px; height: 9px; flex: none; box-sizing: border-box; }
+.stpill.완료::before { background: none; border: 2px solid var(--good); border-radius: 50%; }
+.stpill.진행중::before { background: var(--run); border-radius: 50%; }
+.stpill.확인필요::before, .stpill.확인::before { background: var(--cue-hi); border-radius: 0; transform: rotate(45deg); width: 8px; height: 8px; }
+.stpill.실패::before { background: var(--critical); border-radius: 0; }
+.stpill.wait::before, .stpill.open::before { background: none; border: 1.5px solid var(--muted); border-radius: 50%; }
+.stpill.완료 { color: var(--good); } .stpill.진행중 { color: var(--run); } .stpill.확인필요, .stpill.확인 { color: var(--cue-hi); } .stpill.실패 { color: var(--critical); }
+.sh circle, .sh rect { stroke-width: 0; }
+.sh.run circle { fill: var(--run); }
+.sh.done circle { fill: none; stroke: var(--good); stroke-width: 2; }
+.sh.todo circle { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+.sh.cue rect { fill: var(--cue-hi); }
+.sh.fail rect { fill: var(--critical); }
+.sh.stop rect { fill: var(--warning); }
+.tl .status { fill: var(--ink-2); }
+.tl .status.fold-sum { fill: var(--good); cursor: pointer; }
+.tl .status.fold-sum:hover { fill: var(--acc); }
+
+
+/* 6안 점수 추이: 눈금, 목표선, 채택한 값의 선, 95% 구간 막대, 채택(채운 점)과 버림(속이 빈 점), 판정 O 고리 */
+.pspark .ci { stroke: var(--ink-2); stroke-width: 1.5; opacity: .85; }
+.pspark .pt.drop { stroke: var(--critical); }
+
+/* 5안 좁은 화면(폰, 42 초안 우선순위 2): 머리 줄에는 로고, 확인 필요, 진행 중만 남기고 동시 Cycle과 오늘 보고는 설정 메뉴로 든다. 탭은 가로 스크롤 줄이며, 표와 서랍은 화면 폭 안에 둔다 */
+@media (max-width: 600px) {
+  .top { gap: 8px 10px; padding: 10px 14px; position: static; } /* 휴대폰에서는 머리를 붙이지 않아 본문 자리를 남긴다 */
+  .brand { font-size: 14px; padding: 7px 8px; }
+  .top .modepill, .top #reportBtn, .top .gqpill, .counts .sb-now, .counts .sb-more { display: none; }
+  .menu .row.ph-only { display: flex; }
+  .menu { right: 14px; left: 14px; min-width: 0; top: 50px; }
+  .res { padding: 5px 14px; font-size: 12px; gap: 2px 8px; }
+  .counts { gap: 6px 12px; }
+  .sb b { font-size: 18px; }
+  .tabs { scroll-snap-type: x proximity; }
+  .tabs .tab { scroll-snap-align: start; }
+  .tl { overflow-x: auto; }
+  .tlhelp-box { min-width: 0; width: min(300px, calc(100vw - 32px)); }
+  .todo td { padding: 7px 6px; }
+  .drawer-head { padding: 12px 16px; flex-wrap: wrap; }
+  .drawer-tools { margin-left: 0; }
+  .drawer .md { padding-left: 16px; padding-right: 16px; }
+  .drawer .md pre, .drawer .md table { display: block; max-width: 100%; overflow-x: auto; }
+  .drawer .md img { max-width: 100%; height: auto; }
+  .answer { padding-left: 16px; padding-right: 16px; }
+  .goal-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .goal-row > * { min-width: 0; }
+  .goal-row .g-rec { white-space: normal; }
+  .goal-spark { max-width: 100%; }
+}
+
+/* 머리 숫자(261023-jipsa-38, 37 결과지 답, 44에서 머리 줄 안으로): 확인 필요, 진행 중과 지금 도는 일 한 줄, 멈춤, 실패 */
+.sb { display: inline-flex; align-items: baseline; gap: 7px; font-size: 13px; color: var(--ink-2); background: none; border: 0; padding: 2px 0; flex: none; }
+button.sb { cursor: pointer; } button.sb:hover span { color: var(--acc); }
+.sb b { font: 700 20px/1 var(--mono); }
+.sb .sh-i { width: 10px; height: 10px; display: inline-block; flex: none; align-self: center; }
+.sb.cue b { color: var(--cue-hi); } .sb.cue .sh-i { background: var(--cue-hi); transform: rotate(45deg); width: 9px; height: 9px; }
+.sb.run b { color: var(--run); } .sb.run .sh-i { background: var(--run); border-radius: 50%; }
+.sb.stop b { color: var(--warning); } .sb.stop .sh-i { background: linear-gradient(90deg, var(--warning) 0 3px, transparent 3px 7px, var(--warning) 7px 10px); }
+.sb.fail b { color: var(--critical); } .sb.fail .sh-i { background: var(--critical); }
+.sb.zero, .sb.zero b { color: var(--muted); } .sb.zero .sh-i { opacity: .45; }
+.sb-now { max-width: 380px; min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--grid); padding: 3px 10px; margin-left: -8px; }
+.sb-more { font-size: 12px; margin-left: -10px; }
+@media (max-width: 900px) { .top { position: static; } .counts .sb-now, .counts .sb-more { display: none; } } /* 좁으면 지금 도는 일 한 줄은 숨긴다. 카드와 타임라인에 있다 */
+/* 머리 줄 한 줄(261023-jipsa-42, 사용자 지적): 600px보다 넓으면 머리 줄은 줄을 바꾸지 않는다. 자리가 모자라면 지금 도는 일 글자를 먼저 줄인다 */
+@media (min-width: 601px) {
+  .top > :not(.counts), .top .right > *, .modepill { flex: none; white-space: nowrap; }
+  .counts { flex-wrap: nowrap; overflow: hidden; }
+}
+@media (min-width: 601px) and (max-width: 1600px) {
+  .top { gap: 8px; padding-left: 20px; padding-right: 20px; }
+  .top .right { gap: 6px; }
+  .modepill { padding: 6px 8px; }
+  .sb-now { max-width: 260px; }
+}
+@media (min-width: 601px) and (max-width: 1320px) { .res { font-size: 12px; gap: 2px 6px; } .hl-n { font-size: 11.5px; } }
+/* 좁은 폭에서는 전환 버튼 때문에 숫자가 잘리지 않게 숫자 줄을 둘째 줄로 내린다(261102-jipsa-45) */
+@media (max-width: 800px) { .top { flex-wrap: wrap; } .counts { order: 3; flex: 1 0 100%; flex-wrap: nowrap; overflow: visible; } }
+@media (max-width: 600px) { .theme-flip { padding: 8px 10px; } }
+
+/* TODO 탭(261025-jipsa-29, 33, 36을 46에서 다듬음). Auto, 할 일, 메모 세 칸이 한 규칙을 쓴다.
+   - 칸: 다른 탭의 절(.panel)과 같은 위아래 여백과 밑줄, 제목은 h2 15px. 칸 머리는 제목, 건수, (Auto만) 상태 배지와 한 줄 글, 오른쪽 끝 입력과 단추다.
+   - 줄: 확인 필요 큐(.cq li)와 같은 격자 줄, 13.5px, 위아래 8px, 밑줄. 열은 번호, 프로젝트, 본문, 상태, 단추이고 세 칸이 같은 자리에 둔다.
+   - 글꼴: 본문 글꼴 하나. 고정폭은 줄 번호와 명령 이름에만 쓴다. 단추는 모두 같은 크기(높이 28px, 12.5px)이고 줄마다 둘까지 오른쪽 끝에 둔다 */
+.tfile { display: flex; flex-direction: column; }
+.tfile.busy { opacity: 0.7; }
+.tf-sec { border-bottom: 0; } /* 줄 밑줄이 칸 끝을 보이므로 절 밑줄은 겹쳐 그리지 않는다 */
+.tf-sec:first-child { padding-top: 0; }
+.tf-head { align-items: center; min-height: 28px; gap: 8px 12px; padding: 0 4px; } /* 줄과 같은 4px 안쪽 여백이라 머리 단추와 줄 단추의 오른쪽 끝이 같다 */
+.tf-n { font-size: 13px; color: var(--muted); }
+.tf-badge { font-size: 12px; line-height: 20px; padding: 0 9px; border-radius: 11px; border: 1px solid currentColor; white-space: nowrap; }
+.tf-badge.on { color: var(--acc); background: color-mix(in srgb, var(--acc) 14%, transparent); }
+.tf-badge.off { color: var(--muted); }
+.tf-badge:empty, .tf-state:empty { display: none; }
+.tf-state { font-size: 13px; color: var(--ink-2); min-width: 0; flex: 1 1 200px; }
+.tf-ctl { display: flex; gap: 6px; margin-left: auto; min-width: 0; justify-content: flex-end; }
+/* 넣기 줄(구역 12, 42 초안 우선순위 12): 제목 아래 왼쪽, 폭 760px. 할 일 목록도 같은 폭으로 묶어 글과 단추 사이 간격을 줄인다(261029-jipsa-43) */
+.tf-add { margin: 0 0 10px; max-width: 760px; justify-content: flex-start; padding: 0 4px; }
+.tf-list { max-width: 760px; }
+.tf-out { max-width: 760px; }
+.tf-ctl select, .tf-ctl input, .tf-up select, .tf-up input { height: 28px; background: var(--surface); border: 1px solid var(--grid); padding: 0 8px; font: 13px var(--font); color: var(--ink); min-width: 0; }
+.tf-ctl input { flex: 1 1 auto; }
+#tfUntil { width: 150px; flex: none; }
+.tf-ctl select { flex: 0 1 140px; }
+.tfile .tf-btn { height: 28px; padding: 0 12px; font-size: 12.5px; background: var(--surface-2); border-color: var(--axis); white-space: nowrap; flex: none; }
+.tfile .tf-btn:hover { border-color: var(--acc); color: var(--acc); }
+.tfile .tf-btn.danger:hover { border-color: var(--critical); color: var(--critical); }
+/* 명령 출력 칸. 하나뿐이고 명령을 돌린 칸의 머리 아래로 옮겨 보인다. 첫 줄이 결과, 나머지는 흐린 글이다 */
+.tf-out { border: 1px solid var(--grid); border-left: 3px solid var(--good); background: var(--surface); margin: 0 0 12px; }
+.tf-out.fail { border-left-color: var(--critical); }
+.tf-out-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 3px 4px 10px; font-size: 12px; color: var(--ink-2); }
+.tf-out-head .mono { font: 12px var(--mono); overflow-wrap: anywhere; min-width: 0; }
+.tf-out-body { padding: 0 10px 8px; font-size: 13px; overflow-wrap: anywhere; color: var(--muted); }
+.tf-out-body div:first-child { color: var(--ink); }
+/* 넣는 중 띠(261029-jipsa-49). Do로 시킨 줄이 실행을 시작할 때까지 한 줄씩 보이고 시작하면 사라진다 */
+.tf-placing { max-width: 760px; margin: 0 0 12px; border: 1px solid var(--grid); border-left: 3px solid var(--run); background: var(--surface); }
+.tf-placing[hidden] { display: none; }
+.tf-placing .tf-pl { display: flex; align-items: center; gap: 10px; padding: 5px 10px; font-size: 13px; min-width: 0; text-align: left; }
+.tf-placing .tf-pl + .tf-pl { border-top: 1px solid var(--grid); }
+.tf-placing .sp { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tf-placing .pj { color: var(--muted); font-size: 12px; }
+.tf-placing .nt { flex: none; max-width: 40%; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tf-seg button[hidden] { display: none; }
+/* 줄 */
+.tf-row { display: grid; grid-template-columns: 36px 120px minmax(0, 1fr) 280px 150px; gap: 12px; align-items: start; padding: 8px 4px; border-bottom: 1px solid var(--grid); font-size: 13.5px; line-height: 20px; }
+.tf-row:first-child { border-top: 1px solid var(--grid); }
+.tf-row.moved { background: var(--night); box-shadow: inset 2px 0 0 var(--acc); } /* 올리기와 내리기로 옮겨 간 줄을 2초 밝힌다(261025-jipsa-48) */
+.tf-row .no { font: 12px/20px var(--mono); color: var(--muted); text-align: right; white-space: nowrap; }
+.tf-row .project { font-size: 12.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.tf-row .main { min-width: 0; overflow-wrap: anywhere; }
+.tf-row.wide .main { grid-column: 3 / 5; }
+.tf-row.memo .main { grid-column: 2 / 5; }
+.tf-row .text { font-weight: 600; }
+.tf-row.memo .text { font-weight: 400; }
+.tf-row .meta { display: flex; flex-wrap: wrap; gap: 0 16px; font-size: 12.5px; color: var(--ink-2); }
+.tf-row .meta .k, .tf-row .meta .criteria::before { color: var(--muted); }
+.tf-row .meta .criteria::before { content: "기준 "; }
+.tf-row .status { font-size: 12.5px; min-width: 0; overflow-wrap: anywhere; }
+.tf-row .tf-st { color: var(--muted); }
+.tf-row .tf-st .st { white-space: normal; display: inline; font-size: 12.5px; }
+.tf-row .tf-st .st i { display: inline-block; margin-right: 6px; vertical-align: 0; }
+.tf-row .tf-why { color: var(--muted); }
+.tf-row .tf-note { margin-top: 2px; } /* 할 일 줄의 기준 정하기 상태(261025-jipsa-54) */
+.tf-row .btns { grid-column: 5; display: flex; gap: 6px; justify-content: flex-end; margin: -4px 0; position: relative; }
+/* 줄 끝 ⋯ 메뉴(구역 13, 42 초안 우선순위 18): 지우기, Cycle 고치기, 피드백은 메뉴 안이고 Do와 예약만 밖에 보인다 */
+.tf-row .btns .tf-btn.more { padding: 0 8px; letter-spacing: 1px; font-weight: 600; }
+.tf-row .btns .tf-btn.more[aria-expanded="true"] { border-color: var(--acc); color: var(--acc); }
+.tf-menu { position: absolute; right: 0; top: 30px; z-index: 7; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--surface-2); border: 1px solid var(--grid); box-shadow: 0 8px 24px var(--shadow); min-width: 120px; }
+.tf-menu .tf-btn { justify-content: flex-start; text-align: left; }
+.tf-row.raw .rawtext { grid-column: 1 / 5; color: var(--ink-2); overflow-wrap: anywhere; }
+.tf-row.raw.bad .rawtext { color: var(--critical); }
+.tf-row.raw .st { margin-right: 6px; }
+.tf-up { background: var(--night); }
+.tf-up form { grid-column: 2 / 6; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.tf-up select { flex: 0 1 160px; }
+.tf-up input { flex: 1 1 240px; }
+/* 할 일 줄은 단추 셋(Do, 예약, ⋯)이다. 목록 폭이 760px이라 단추 칸은 그만큼만 둔다 */
+.tf-row.b3 { grid-template-columns: 36px 110px minmax(0, 1fr) 150px; }
+.tf-row.b3.wide .main { grid-column: 3; }
+.tf-row.b3 .btns { grid-column: 4; }
+.tf-row.memo { grid-template-columns: 36px minmax(0, 1fr) 150px; }
+.tf-row.memo .main { grid-column: 2; }
+.tf-row.memo .btns { grid-column: 3; }
+.tf-row .no { display: flex; justify-content: space-between; align-items: baseline; }
+.tf-row .no i { font-style: normal; }
+.tf-row .no .cm { font: 700 12px/16px var(--mono); color: var(--acc); cursor: help; } .tf-row .no .cm.pend { color: var(--warning); } /* 켜진 Cycle 표시. 목표 미정은 노란색(261026-jipsa-16) */
+.tf-btn.on { color: var(--acc); border-color: var(--acc); background: color-mix(in srgb, var(--acc) 14%, transparent); }
+.tf-empty { margin: 0; padding: 8px 4px; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid); color: var(--muted); font-size: 13.5px; line-height: 20px; }
+@media (max-width: 900px) {
+  .tf-row { grid-template-columns: 28px 110px minmax(0, 1fr) 200px auto; }
+  .tf-row.b3 { grid-template-columns: 28px 100px minmax(0, 1fr) 150px; }
+  .tf-row.memo { grid-template-columns: 28px minmax(0, 1fr) 150px; }
+}
+/* 좁은 화면: 줄 머리(번호, 프로젝트, 단추) 아래에 본문과 상태를 놓는다. 확인 필요 큐의 좁은 화면 규칙과 같다 */
+@media (max-width: 720px) {
+  .tf-ctl, .tf-add { flex: 1 1 100%; margin-left: 0; }
+  #tfUntil { flex: 1 1 auto; width: auto; }
+  .tf-state { flex-basis: 100%; order: 5; }
+  .tf-ctl { order: 6; }
+  .tf-row, .tf-row.b3 { grid-template-columns: 28px minmax(0, 1fr) auto; grid-template-areas: "no pj btn" "main main main" "st st st"; row-gap: 4px; }
+  .tf-row .no { grid-area: no; text-align: left; } .tf-row .project { grid-area: pj; } .tf-row .btns, .tf-row.b3 .btns { grid-area: btn; }
+  .tf-row .main, .tf-row.wide .main, .tf-row.b3.wide .main { grid-area: main; } .tf-row .status { grid-area: st; }
+  .tf-row.memo { grid-template-columns: 28px minmax(0, 1fr) auto; grid-template-areas: "no main btn"; }
+  .tf-row.memo .main { grid-area: main; } .tf-row.memo .btns { grid-area: btn; }
+  .tf-add select { flex: 1 1 100%; }
+  .tf-row.raw .rawtext { grid-column: 1 / -1; }
+  .tf-up form { grid-column: 1 / -1; }
+}
+
+/* GPU 장부 막대와 대기열(261026-jipsa-26) */
+.hl .gbar { display: inline-flex; width: 120px; height: 10px; margin: 0 6px 0 4px; border: 1px solid var(--axis); border-radius: 2px; overflow: hidden; vertical-align: middle; background: transparent; }
+.hl .gseg { display: block; height: 100%; }
+.hl .gseg.out { background: var(--gseg-out); }
+.hl .gseg.rsv { background: repeating-linear-gradient(135deg, var(--gseg-rsv) 0 2px, transparent 2px 5px); }
+/* 머리 줄 GPU 실측 칸(261029-jipsa-17). 글자와 같은 색 구간이다 */
+.hl .gseg.use.ok { background: var(--good); } .hl .gseg.use.warn { background: var(--warning); } .hl .gseg.use.crit { background: var(--critical); }
+/* GPU 대기 n(261029-jipsa-17). 동시 Cycle 칸 옆이고 누르면 TODO 탭 자원과 대기열로 간다 */
+.gqpill { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/1 var(--mono); border: 1px solid var(--grid); color: var(--ink-2); background: none; padding: 6px 10px; cursor: pointer; white-space: nowrap; flex: none; }
+.gqpill b { color: var(--ink); }
+.gqpill.on { border-color: var(--warning); color: var(--warning); }
+.gqpill.on b { color: var(--warning); }
+.gqpill[hidden] { display: none; }
+
+/* TODO 탭 위 띠(261029-jipsa-17 다안 3차, 261029-jipsa-20, 44에서 한 줄 요약으로). 한 줄 띠(구역 11)에 대기열, 예약, Cycle 건수와 첫 항목이 붙고,
+   펼치면 왼쪽 대기열과 예약 상자, 오른쪽 Cycle 줄이 나온다 */
+.tf-line { display: flex; gap: 6px 18px; align-items: center; flex-wrap: wrap; border: 1px solid var(--grid); background: var(--surface); padding: 8px 14px; margin-bottom: 18px; font-size: 13px; color: var(--ink-2); }
+.tf-line b { color: var(--ink); font-weight: 600; }
+.tf-line .it { color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; }
+.tf-line .it .mono { color: var(--run); font-size: 12.5px; }
+.tf-line .it.why { color: var(--critical); }
+.tf-line .lnk { margin-left: auto; }
+.tf-band { display: grid; grid-template-columns: 340px minmax(0, 1fr); border: 1px solid var(--grid); border-top: 0; background: var(--surface); margin: -18px 0 18px; }
+.tf-res { padding: 12px 16px; border-right: 1px solid var(--grid); min-width: 0; }
+.tf-now { padding: 12px 16px; min-width: 0; }
+.tf-band h2 { font-size: 14px; margin: 0 0 6px; display: flex; gap: 8px; align-items: baseline; }
+.tf-band .hint, .tf-do .hint { font-size: 12px; color: var(--muted); font-weight: 400; }
+.tf-band .hint.pad { padding: 6px 0; }
+.tf-band .hint.foot { padding-top: 10px; }
+.tf-band .link { background: none; border: 0; padding: 0; font: inherit; color: var(--acc); cursor: pointer; }
+.tf-band .rb { margin-top: 10px; }
+.tf-band .rb.why { color: var(--critical); font-size: 12px; }
+.tf-band .q + .q, .tf-band .rb + .q { border-top: 1px solid var(--grid); margin-top: 12px; padding-top: 8px; }
+.tf-band .qi { padding: 6px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.tf-band .qi:last-child { border-bottom: 0; }
+.tf-band .qh { display: flex; gap: 8px; align-items: center; } /* 한 줄. 순번, 프로젝트와 이름, 오른쪽 끝 단추(261029-jipsa-20) */
+.tf-band .qh .no { font: 12px var(--mono); color: var(--muted); width: 16px; flex: none; }
+.tf-band .qh .no.wide { width: auto; color: var(--acc); }
+.tf-band .qh .sp { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tf-band .qh .sp .pj { color: var(--muted); font-size: 12px; }
+.tf-band .qh .tf-btn { flex: none; }
+.tf-band .qh .sp b, .tf-band .lane .lno { font-family: var(--mono); color: var(--acc); }
+.tfile .tf-band .tf-btn { height: 24px; padding: 0 8px; font-size: 12px; }
+.tf-band .lane { display: grid; grid-template-columns: minmax(200px, 1fr) 170px minmax(220px, 1.4fr) 130px; gap: 16px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.tf-band .lane .nm > b { font-weight: 600; }
+.tf-band .lane .nm .meta { color: var(--muted); font-size: 12px; margin: 2px 0; }
+.tf-band .lane .st { white-space: normal; }
+.tf-band .lane.wait .nm > b { color: var(--ink-2); }
+.tf-band .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tf-band .chip { font: 11px var(--mono); border: 1px solid var(--grid); padding: 1px 6px; color: var(--ink-2); }
+.tf-band .chip.sig { border-color: var(--cue-edge); color: var(--cue-edge); }
+.tf-band .br { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+.tf-band .br b { color: var(--acc); font-weight: 600; }
+.met { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+.met b { font: 700 14px var(--mono); color: var(--run); margin: 0 4px; }
+.met b.ok { color: var(--good); }
+.met .tg { color: var(--muted); margin-left: 4px; }
+.tf-band .pbar { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.tf-band .pbar .bar { width: 200px; max-width: 70%; height: 6px; background: var(--grid); }
+.tf-band .pbar .bar > div { height: 6px; background: var(--run); }
+.tf-band .pbar .bar.good > div { background: var(--good); }
+.tf-band .spark { display: block; }
+.tf-band .fbr { display: flex; flex-direction: column; gap: 6px; } /* 결과지 서랍 답 넣기 칸과 같은 여러 줄 칸과 아래 단추 줄(261029-jipsa-19) */
+.tf-band .fb textarea { min-height: 5em; font-size: 12.5px; }
+.tf-band .fb .answer-row { flex-wrap: nowrap; gap: 8px; } .tf-band .fb .answer-hint { font-size: 11px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .tf-band .fb .answer-count { flex: none; } /* 줄이 좁아도 단추, 안내, 글자 수를 한 줄에 둔다 */
+.tf-band .fbls { margin-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+.tf-band input { height: 26px; background: var(--surface-2); border: 1px solid var(--grid); padding: 0 6px; font: 12px var(--font); color: var(--ink); min-width: 0; }
+.tf-band .fbr input { flex: 1; }
+.tf-band .fbl { display: flex; gap: 8px; font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+.tf-band .fbl .fbt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* 항목마다 한 줄. 전문은 마우스를 올리면 보인다(261029-jipsa-20) */
+.tf-band .fbl span { font-family: var(--mono); color: var(--muted); flex: none; }
+.tf-band .act { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.tf-band .act .kv { display: flex; align-items: center; gap: 6px; font-family: var(--mono); }
+.tf-band .act .kv span { width: 28px; color: var(--muted); font-family: var(--font); flex: none; }
+.tf-band .act input { width: 100%; font-family: var(--mono); }
+/* 할 일 칸 고르기와 Do, 예약 칸 */
+.tf-seg { display: inline-flex; border: 1px solid var(--grid); }
+.tf-seg[hidden] { display: none; }
+.tf-seg button { background: none; border: 0; padding: 3px 10px; font-size: 12px; color: var(--ink-2); cursor: pointer; }
+.tf-seg button.on { background: var(--surface-2); color: var(--ink); }
+.tfile .tf-btn.do { border-color: var(--run); color: var(--run); }
+.tfile .tf-btn.rsv { border-color: var(--acc); color: var(--acc); }.tf-do { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 8px; padding: 6px 8px; font-size: 12px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--grid); }
+.tf-do .k { color: var(--muted); }
+.tf-do input { width: 80px; height: 26px; background: var(--surface-2); border: 1px solid var(--grid); padding: 0 6px; font: 12px var(--mono); color: var(--ink); }
+.tf-row .tf-note.pause { color: var(--cue-edge); font-size: 12.5px; }
+@media (max-width: 1200px) { .tf-band .lane { grid-template-columns: minmax(0, 1fr) 190px; } }
+@media (max-width: 900px) { .tf-band { grid-template-columns: minmax(0, 1fr); } .tf-res { border-right: 0; border-bottom: 1px solid var(--grid); } .tf-band .lane { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .tf-line { gap: 4px 14px; } .tf-line .lnk { margin-left: 0; } .tf-line .it { max-width: 100%; } }

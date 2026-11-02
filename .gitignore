@@ -1,0 +1,73 @@
+# 비밀값과 로그인 쿠키
+.env
+.env.*
+!.env.example
+*.cookie
+cookie*.txt
+cookies*.txt
+.secrets/
+
+# 이 컴퓨터에서만 의미 있는 상태: 큐, 리스, 이벤트, 작업 트리
+runtime/
+worktrees/
+
+# 개인 기록. 실행 기록, 그날 보고, 주간 계획은 이 컴퓨터에만 둔다
+runs/
+reports/
+planner/
+
+# 프로젝트 전용 규칙. 있으면 작업자 지시에 들어가고 git에는 넣지 않는다
+docs/local/
+
+# 개인 등록부. 예시 등록부만 저장소에 둔다
+projects/*.toml
+!projects/example_app.toml
+!projects/misc.toml
+
+# 가상환경과 캐시
+.venv/
+envs/
+__pycache__/
+*.pyc
+*.egg-info/
+.uv-cache/
+.ruff_cache/
+.pytest_cache/
+
+# 글꼴 파일은 web/fonts/README.md의 명령으로 받는다
+web/fonts/*.woff2
+
+# 그림과 영상. 화면 캡처는 다시 찍을 수 있고 개인 자료가 비칠 수 있다
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.mp4
+*.mov
+*.webm
+
+# 대용량 자료와 산출물
+data/
+models/
+out/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.gguf
+*.onnx
+*.zip
+*.7z
+
+# RULES.md에서 만드는 사본(jipsa sync-agents)
+AGENTS.md
+
+# 사람마다 다른 Claude Code 설정. 절대 경로가 들 수 있어 저장소에 넣지 않는다
+.claude/settings.local.json
+.claude/*.local.*
+CLAUDE.local.md
+
+# 사람이 지울 파일을 옮겨 두는 폴더. 사람이 직접 비운다
+/trash/
