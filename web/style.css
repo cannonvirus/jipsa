@@ -663,6 +663,11 @@ button.sb { cursor: pointer; } button.sb:hover span { color: var(--acc); }
 /* 넣기 줄(구역 12, 42 초안 우선순위 12): 제목 아래 왼쪽, 폭 760px. 할 일 목록도 같은 폭으로 묶어 글과 단추 사이 간격을 줄인다(261029-jipsa-43) */
 .tf-add { margin: 0 0 10px; max-width: 760px; justify-content: flex-start; padding: 0 4px; }
 .tf-list { max-width: 760px; }
+.tf-new { margin-top: -4px; }
+.tf-new-out { max-width: 760px; margin: 0 0 10px; padding: 0 4px; font-size: 12.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.tf-new-out.fail { color: var(--bad, #d66); }
+.tf-cyc { flex-wrap: wrap; }
+.tf-cyc input[type="checkbox"] { width: auto; height: auto; margin: 0 4px 0 0; vertical-align: -1px; }
 .tf-out { max-width: 760px; }
 .tf-ctl select, .tf-ctl input, .tf-up select, .tf-up input { height: 28px; background: var(--surface); border: 1px solid var(--grid); padding: 0 8px; font: 13px var(--font); color: var(--ink); min-width: 0; }
 .tf-ctl input { flex: 1 1 auto; }
@@ -841,3 +846,4 @@ button.sb { cursor: pointer; } button.sb:hover span { color: var(--acc); }
 @media (max-width: 1200px) { .tf-band .lane { grid-template-columns: minmax(0, 1fr) 190px; } }
 @media (max-width: 900px) { .tf-band { grid-template-columns: minmax(0, 1fr); } .tf-res { border-right: 0; border-bottom: 1px solid var(--grid); } .tf-band .lane { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) { .tf-line { gap: 4px 14px; } .tf-line .lnk { margin-left: 0; } .tf-line .it { max-width: 100%; } }
+.confirm .route-open { color: var(--cue-edge); font-weight: 600; } /* 넣은 답을 아직 아무도 받지 않았다는 줄(261103-jipsa-08) */

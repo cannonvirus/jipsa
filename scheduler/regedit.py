@@ -14,7 +14,7 @@ import re
 import tomllib
 from pathlib import Path
 
-from scheduler.config import DEFAULT_SEGMENT_MIN, DEFAULT_TOTAL_MIN, PROJECTS, now
+from scheduler.config import DEFAULT_SEGMENT_MIN, DEFAULT_TOTAL_MIN, PROJECTS, ROOT, now
 from scheduler.regline import LineError, _array_end
 from scheduler.registry import KINDS, WORKER_PROVIDERS, RegistryError, _load_one
 
@@ -438,6 +438,82 @@ def save(project: str, values: dict, version: str | None = None, dry_run: bool =
     else:
         os.replace(tmp, path)
     return {"ok": True, "project": project, "changed": sorted(changes), "lines": len(diff), "diff": diff, "dry_run": dry_run, "version": version_of(path)}
+
+
+# ----- 새 프로젝트 폴더 -----
+def default_repo(name: str, cwd: Path | None = None) -> Path:
+    """이름만 받았을 때 프로젝트 폴더. 실행한 폴더 아래 <이름>이다. 실행한 폴더가 jipsa 저장소 안이면 저장소 안에 저장소를 겹치지 않도록
+    저장소 바로 위 폴더 아래로 한다. 세션 입구가 jipsa 저장소라 평소에는 이쪽이고, 있던 등록들이 놓인 자리와 같다."""
+    home = (ROOT.parent.parent if ROOT.parent.name == "worktrees" else ROOT).resolve()  # worktree에서 돌려도 본 저장소 기준이다
+    here = Path(cwd or Path.cwd()).resolve()
+    return (home.parent if here == home or home in here.parents else here) / name
+
+
+def make_repo(repo: Path) -> dict:
+    """프로젝트 폴더를 준비한다. 있는 폴더는 건드리지 않고 worktree를 못 만드는 상태면 알린다. 없는 폴더는 만들고 git 첫 커밋까지 한다.
+    code 작업은 HEAD에서 worktree를 만들므로 첫 커밋이 있어야 돈다."""
+    from scheduler.workspace import GitError, git, is_repo
+
+    if repo.exists():
+        if not repo.is_dir():
+            return {"ok": False, "why": f"같은 이름의 파일이 있다: {repo}"}
+        if not is_repo(repo):
+            return {"ok": True, "made": False, "note": "있던 폴더가 git 저장소가 아니다. 그 폴더에서 git init과 첫 커밋을 해야 작업이 돈다"}
+        if not git(repo, "rev-parse", "--verify", "-q", "HEAD", check=False).strip():
+            return {"ok": True, "made": False, "note": "있던 저장소에 커밋이 없다. 첫 커밋을 해야 작업이 돈다"}
+        return {"ok": True, "made": False, "note": ""}
+    try:
+        repo.mkdir(parents=True)
+        git(repo, "init", "-q")
+        (repo / ".gitignore").write_text(".env\n.venv/\n__pycache__/\n", encoding="utf-8")
+        git(repo, "add", ".gitignore")
+        who = []  # git 사용자 설정이 없는 컴퓨터에서도 첫 커밋이 되게 한다. 있으면 그 값을 쓴다
+        if not git(repo, "config", "user.name", check=False).strip():
+            who += ["-c", "user.name=jipsa"]
+        if not git(repo, "config", "user.email", check=False).strip():
+            who += ["-c", "user.email=jipsa@localhost"]
+        git(repo, *who, "commit", "-q", "-m", "프로젝트를 시작한다")
+    except (OSError, GitError) as e:
+        return {"ok": False, "why": f"폴더 {repo}를 준비하지 못했다. 등록하지 않았다. 원인을 고친 뒤 다시 돌리면 그 폴더를 쓴다: {e}"}
+    return {"ok": True, "made": True, "note": ""}
+
+
+def made_text(path: str | Path, made: dict) -> str:
+    return f"폴더 {Path(path).as_posix()}{'를 만들고 git 첫 커밋까지 했다' if made['made'] else '는 있던 폴더를 그대로 썼다'}"
+
+
+# Windows가 파일 이름으로 받지 않는 이름. 이름 규칙은 통과하지만 폴더를 만들 수 없다
+_RESERVED = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}
+
+
+def new_project(values: dict, cwd: Path | None = None, check: bool = False) -> dict:
+    """무질문 등록(261103-jipsa-06). 경로가 없으면 이름으로 폴더를 정해 첫 커밋까지 하고 등록한다. /jipsa-register와 대시보드 만들기가 함께 쓴다.
+    이름과 값 검사를 통과한 뒤에만 폴더를 만든다. 경로를 이름에서 만들므로 이름은 규칙에 온전히 맞아야 하고 예약어는 받지 않는다."""
+    values = dict(values)
+    name = str(values.get("name") or "").strip()
+    if not _NAME_RE.fullmatch(name):
+        return {"ok": False, "why": "이름은 영문 소문자, 숫자, 밑줄만 40자 안으로 쓴다"}
+    if name in _RESERVED:
+        return {"ok": False, "why": f"{name}은(는) Windows 예약어라 폴더 이름으로 쓰지 못한다"}
+    values["name"] = name
+    auto = "path" not in values
+    if auto:
+        values["path"] = str(default_repo(name, cwd))
+    values.setdefault("kind", "code")
+    out = create(values, dry_run=True)
+    if not out["ok"] or check:
+        return out
+    made = None
+    if auto:
+        made = make_repo(Path(values["path"]))
+        if not made["ok"]:
+            return {"ok": False, "why": made["why"]}
+    out = create(values)
+    if out["ok"] and made:
+        out["made"] = {**made, "path": values["path"]}
+        if made["note"]:
+            out["note"] = made["note"]
+    return out
 
 
 # ----- 새 등록 -----

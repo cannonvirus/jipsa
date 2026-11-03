@@ -36,10 +36,10 @@
 
 ## 만들고 고치기
 
-파일을 직접 고치지 않아도 된다. 세션에서는 `/jipsa-register <이름>`, `/jipsa-register <이름> edit`, `/jipsa-register <이름> show`를 부른다. 스킬이 부르는 명령은 아래와 같다. 이름은 영문 소문자, 숫자, 밑줄만 40자 안으로 쓴다.
+파일을 직접 고치지 않아도 된다. 새 프로젝트는 대시보드 TODO 탭의 **프로젝트 만들기**나 세션의 `/jipsa-register <이름>`으로 이름 하나만 넣어 만든다. 세션에서 고치고 보려면 `/jipsa-register <이름> edit`, `/jipsa-register <이름> show`를 부른다. 스킬이 부르는 명령은 아래와 같다. 이름은 영문 소문자, 숫자, 밑줄만 40자 안으로 쓴다.
 
 - `uv run jipsa registry show [<이름>]`: 등록 목록, 또는 그 등록의 칸 19개와 값을 보인다.
-- `uv run jipsa registry new <이름> path=<경로> kind=<종류>`: 새 등록을 만든다. `--check`를 붙이면 쓰지 않고 검사만 한다.
+- `uv run jipsa registry new <이름> [path=<경로>] [kind=<종류>]`: 새 등록을 만든다. 경로를 주지 않으면 jipsa 저장소와 나란한 폴더를 만들어 git 첫 커밋까지 하고, 종류 기본값은 code다. `--check`를 붙이면 쓰지 않고 검사만 한다.
 - `uv run jipsa registry edit <이름> <칸>=<값> <칸>+=<값>`: 바뀐 키 줄만 고치고 주석과 키 순서는 둔다. `--check`도 같다.
 - `uv run jipsa registry add <프로젝트> <칸> <문구> --run <실행ID>`: 그 실행의 사람 답에 적힌 문구만 목록 칸 끝에 더한다.
 

@@ -31,8 +31,8 @@ import re
 from dataclasses import replace
 from datetime import datetime, timedelta
 
-from scheduler import cycle, events, modes, queue, record, report, resources, todo, workitem
-from scheduler.config import (AUTO_CAP, DO_SESSION_GRACE_SEC, MORNING_AT, STATE, next_cutoff,
+from scheduler import cycle, draftask, events, modes, queue, record, report, resources, todo, workitem
+from scheduler.config import (ANSWER_WORKER_MAX_AGE_SEC, AUTO_CAP, DO_SESSION_GRACE_SEC, RUNS, MORNING_AT, STATE, next_cutoff,
                               now, now_iso, parse_hhmm, parse_iso)
 from scheduler.registry import Project
 
@@ -123,6 +123,8 @@ def entry(it: todo.Todo, project: Project, run_id: str, mode: dict) -> dict:
         "added": now_iso(), "started": None, "finished": None, "answer": None, "wait_since": None, "tier": TIER,
         "category": "", "pick": False, "category_guess": False, "after": [],
         "todo_key": it.key, "todo_line": it.line(), "limits": dict(it.limits), "auto_since": mode.get("since"),
+        # 문장에 초안 요청이 있는 단발 줄은 세션 begin과 같게 초안 실행이다(261103-jipsa-07)
+        **({"draft": True} if not it.cycle and draftask.line_wants(project.name, it.text, it.criteria) else {}),
     }
 
 
@@ -446,6 +448,7 @@ def plan_project(project: Project) -> Project:
 def plan_entry(it: todo.Todo, project: Project, run_id: str, mode: dict) -> dict:
     e = entry(it, project, run_id, mode)
     e.update(title=f"{PLAN_TITLE}: {it.text}"[:80], criteria=plan_criteria(it), est_minutes=PLAN_MIN, needs_gpu=False, todo_plan=it.key)
+    e.pop("draft", None)  # 기준 정하기는 초안을 만들지 않는다. 본 작업 줄이 받는다
     return e
 
 
@@ -728,7 +731,7 @@ def step(registry: dict, mode: dict, start, *, only: str, can=None, active: set 
 # ----- 시키기(261026-jipsa-12, 여러 줄과 세션 넘기기는 261026-jipsa-26, 시작과 마감은 261029-jipsa-17) -----
 # 할 일 줄 하나를 돌린다. `jipsa todo run <번호|문장 일부> [시작 HH:MM] [마감 HH:MM|+4h]`과 대시보드 Do 단추가 같다.
 # 일회성 줄은 시작 시각을 받지 않고 바로 돈다. 열린 세션(답 대기 명령이 떠 있는 세션)이 있으면 그 세션의 받은편지함에 Do 요청으로 넣고,
-# 세션이 없거나 2분 안에 받지 않으면 스케줄러 작업자 요청으로 넘긴다(do_fallback). Cycle 목표 줄은 세션으로 보내지 않고 작업자로 돈다.
+# 세션이 없거나 2분 안에 받지 않으면 스케줄러 작업자 요청으로 넘긴다(do_fallback). 결과지에 넣은 답도 같은 규칙이다(answer_fallback). Cycle 목표 줄은 세션으로 보내지 않고 작업자로 돈다.
 # 요청은 상태 폴더 run_now.json의 목록이고 줄마다 하나다. 같은 줄을 두 번 시키는 것만 거절한다. 스케줄러 주기마다 요청마다 run_turn이
 # 그 줄 하나로 step(only=key)을 돈다. 요청은 그 일이 끝날 때 지운다: 일회성 줄은 큐 줄이 끝날 때, 기준 없는 줄은 기준 정하기 뒤 본 작업이
 # 끝날 때, Cycle 목표는 끝 조건이나 마감(정하지 않으면 시작 뒤 8시간, 멈추기는 마감을 지금으로 당긴다)에.
@@ -983,6 +986,83 @@ def do_fallback() -> list[str]:
         except todo.TodoError as e:
             events.emit("do_fallback_refused", key=r["todo_key"], why=str(e)[:200])
     return out
+
+
+ANSWER_SOURCE = "answer"  # 세션이 받지 않은 답을 잇는 큐 줄의 출처
+
+
+def _answer_prompt(r: dict, prev: str, branch: str) -> str:
+    """넘겨받은 작업자가 앞 결과지를 읽고 잇게 하는 답 글. 지시문의 '사람의 답' 절로 들어간다."""
+    base = RUNS / prev
+    dirs = record.attempt_dirs(prev)
+    report_at = (dirs[-1] / "report.md").as_posix() if dirs else ""
+    return "\n".join([
+        str(r.get("answer") or ""),
+        *([f"고른 안: {r['picked']}"] if r.get("picked") else []),
+        "",
+        f"이 답은 앞 실행 {prev}의 결과지에 사람이 넣은 것이고, 세션이 받지 않아 이 실행으로 넘어왔다.",
+        f"먼저 앞 결과지 {(base / 'result.md').as_posix()}" + (f"와 보고서 {report_at}" if report_at else "") + "를 읽고 답대로 이어서 일한다.",
+        *([f"앞 실행의 브랜치 {branch} 위에서 시작했다. 그 변경을 이어 받는다."] if branch else []),
+        "답이 이 프로젝트의 허용 범위나 공통 규칙 밖의 일을 요구하면 하지 않고 result.json에 확인 필요로 적는다.",
+    ])
+
+
+def _answer_branch(project: Project, meta: dict) -> str:
+    """앞 실행의 브랜치가 살아 있고 아직 병합되지 않았으면 그 이름이다. 병합됐거나 없으면 빈 값이고 새 작업은 원본 HEAD에서 시작한다."""
+    from scheduler import workspace
+
+    branch = str(meta.get("branch") or "")
+    if not branch or not project.uses_worktree:
+        return ""
+    try:
+        if not workspace.git(project.path, "rev-parse", "--verify", "--quiet", branch, check=False).strip():
+            return ""
+        merged = workspace.git(project.path, "branch", "--merged", "HEAD", "--list", branch, check=False).strip()
+    except Exception:  # noqa: BLE001 - 브랜치를 못 읽어도 답은 넘긴다
+        return ""
+    return "" if merged else branch
+
+
+def answer_entry(r: dict, project: Project, meta: dict) -> dict:
+    """세션이 받지 않은 답을 잇는 큐 줄. answer 칸이 차 있어 스케줄러가 시킨 줄 없이도 바로 시작한다(loop.manual_startable)."""
+    prev = r["run_id"]
+    run_id = record.new_run_id(project.name)
+    branch = _answer_branch(project, meta)
+    title = str(r.get("title") or meta.get("title") or prev)
+    title = title if title.endswith(" 답 처리") else f"{title} 답 처리"
+    return {
+        "key": f"answer:{prev}@{run_id}", "project": project.name, "title": title,
+        "criteria": f"앞 실행 {prev}의 결과지에 넣은 사람의 답대로 이어서 처리한다. 답: {str(r.get('answer') or '')[:200]}",
+        "est_minutes": None, "kind": project.kind, "priority": project.priority, "needs_gpu": project.needs_gpu,
+        "status": queue.PENDING, "reason": "", "run_id": run_id, "source": ANSWER_SOURCE, "file": "", "line": None,
+        "added": now_iso(), "started": None, "finished": None, "answer": _answer_prompt(r, prev, branch), "wait_since": None, "tier": "",
+        "category": "", "pick": False, "category_guess": False, "after": [], "from_run": prev,
+        **({"start_ref": branch} if branch else {}),
+        **({"draft": True} if draftask.from_answers([r])[0] == draftask.SHEET else {}),
+    }
+
+
+def answer_fallback() -> list[str]:
+    """세션이 2분 안에 받지 않은 답을 새 작업자 실행으로 넘긴다. 스케줄러 주기마다 부른다. 넘긴 답의 실행ID 목록이다(261103-jipsa-08 사용자 답 1안)."""
+    from scheduler.registry import load_all
+
+    registry = load_all()
+
+    def refuse(r: dict) -> str:
+        project = registry.get(r.get("project") or "")
+        if project is None:
+            return "등록부에 없는 프로젝트라 스케줄러가 돌리지 못한다"
+        if project.manual_only:
+            return "세션 전용 프로젝트라 스케줄러가 돌리지 않는다"
+        return "" if record.meta_of(r["run_id"]) else "앞 실행 기록이 없다"
+
+    def hand(r: dict) -> str:
+        meta = record.meta_of(r["run_id"]) or {}
+        e = queue.add_entry(answer_entry(r, registry[r["project"]], meta))
+        events.emit("answer_fallback", run=r["run_id"], worker_run=e["run_id"], session=r.get("parent_run"))
+        return e["run_id"]
+
+    return [r["run_id"] for r in record.answer_stale(DO_SESSION_GRACE_SEC, ANSWER_WORKER_MAX_AGE_SEC, refuse, hand)]
 
 
 def run_note(req: dict) -> str:

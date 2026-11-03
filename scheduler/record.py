@@ -481,6 +481,34 @@ def reopen(run_id: str, *, notify: bool = True) -> dict:
 
 
 INBOX =STATE / "session_inbox.jsonl"  # 세션이 하던 일에 들어온 답. hook이 세션에 넘기고, 못 넘기면 스케줄러가 작업자로 돌린다
+_INBOX_LOCK = STATE / "session_inbox.lock"  # 받은편지함을 고치는 쪽(대시보드, 명령, 답 대기 명령, hook, 스케줄러)이 함께 잡는 잠금. hooks/track.py가 같은 규칙으로 잡는다
+
+
+class inbox_lock:
+    """받은편지함을 읽고 고치는 동안 잡는 파일 잠금. 세션과 스케줄러가 같은 답을 함께 가져가지 못하게 한다. 10초 넘은 잠금은 주인이 죽은 것으로 보고 버린다."""
+
+    def __enter__(self):
+        import time
+
+        _INBOX_LOCK.parent.mkdir(parents=True, exist_ok=True)
+        for _ in range(300):
+            try:
+                os.close(os.open(_INBOX_LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+                return self
+            except (FileExistsError, PermissionError):
+                try:
+                    if time.time() - _INBOX_LOCK.stat().st_mtime > 10:
+                        _INBOX_LOCK.unlink()
+                except OSError:
+                    pass
+                time.sleep(0.05)
+        return self
+
+    def __exit__(self, *exc):
+        try:
+            _INBOX_LOCK.unlink()
+        except OSError:
+            pass
 
 
 def inbox_load() -> list[dict]:
@@ -491,8 +519,19 @@ def inbox_load() -> list[dict]:
 
 
 def inbox_save(rows: list[dict]) -> None:
+    import time
+
     INBOX.parent.mkdir(parents=True, exist_ok=True)
-    INBOX.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    tmp = INBOX.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")  # 읽는 쪽에 반쯤 쓰인 파일이 보이지 않게 바꿔치기한다
+    tmp.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    for n in range(20):
+        try:
+            os.replace(tmp, INBOX)
+            return
+        except PermissionError:  # Windows에서 다른 프로세스가 읽는 순간에는 바꿔치기가 막힌다
+            if n == 19:
+                raise
+            time.sleep(0.05)
 
 
 def inbox_add(meta: dict, text: str, picks: list[dict] | None = None) -> dict:
@@ -503,9 +542,10 @@ def inbox_add(meta: dict, text: str, picks: list[dict] | None = None) -> dict:
     if got:
         row["picked"] = " / ".join(c["text"] for c in got)  # 옛 기록과 같은 글자 칸이다. 안이 여럿이면 빗금으로 잇는다
         row["picks"] = [c["name"] for c in got]  # 고른 안 이름 목록. 옛 기록에는 없고 picked 글자만 있다
-    rows = inbox_load()
-    rows.append(row)
-    inbox_save(rows)
+    with inbox_lock():
+        rows = inbox_load()
+        rows.append(row)
+        inbox_save(rows)
     return row
 
 
@@ -577,9 +617,10 @@ def do_add(item, session_run: str) -> dict:
     row = {"ts": now_iso(), "kind": "do", "run_id": f"do:{item.key}", "project": item.project, "title": item.text,
            "criteria": item.criteria or "", "todo_key": item.key, "todo_no": item.no, "line": item.line(), "answer": "",
            "parent_run": session_run, "delivered": None, "delivered_to": None, "worker": None}
-    rows = inbox_load()
-    rows.append(row)
-    inbox_save(rows)
+    with inbox_lock():
+        rows = inbox_load()
+        rows.append(row)
+        inbox_save(rows)
     events.emit("do_session", key=item.key, project=item.project, title=item.text, session=session_run)
     return row
 
@@ -598,37 +639,103 @@ def do_open(key: str) -> dict | None:
 
 def do_begun(key: str, run_id: str) -> None:
     """begin --todo가 그 줄을 열었다. Do 요청에 실행ID를 적어 같은 줄 거절을 푼다."""
-    rows = inbox_load()
-    hit = False
-    for r in rows:
-        if r.get("kind") == "do" and r.get("todo_key") == key and not r.get("begun"):
-            r["begun"] = run_id
-            hit = True
-    if hit:
-        inbox_save(rows)
+    with inbox_lock():
+        rows = inbox_load()
+        hit = False
+        for r in rows:
+            if r.get("kind") == "do" and r.get("todo_key") == key and not r.get("begun"):
+                r["begun"] = run_id
+                hit = True
+        if hit:
+            inbox_save(rows)
 
 
 def do_stale(grace_sec: int) -> list[dict]:
     """세션이 grace_sec 안에 받지 않은 Do 요청. 작업자로 넘긴다고 표시하고 돌려준다."""
-    rows = inbox_load()
-    out = []
-    for r in rows:
-        if r.get("kind") == "do" and not r.get("delivered") and not r.get("worker") \
-                and (now() - parse_iso(r["ts"])).total_seconds() >= grace_sec:
-            r["worker"] = now_iso()
-            out.append(r)
-    if out:
-        inbox_save(rows)
+    with inbox_lock():
+        rows = inbox_load()
+        out = []
+        for r in rows:
+            if r.get("kind") == "do" and not r.get("delivered") and not r.get("worker") \
+                    and (now() - parse_iso(r["ts"])).total_seconds() >= grace_sec:
+                r["worker"] = now_iso()
+                out.append(r)
+        if out:
+            inbox_save(rows)
     return out
 
 
-def _inbox_drop(run_id: str) -> bool:
-    """물린 답이 아직 세션에 넘어가지 않았으면 받은편지함에서 뺀다. 이미 넘어간 답이 있었으면 참이다."""
-    rows = inbox_load()
-    keep = [r for r in rows if r["run_id"] != run_id or r.get("delivered") or r.get("worker")]
-    if len(keep) != len(rows):
-        inbox_save(keep)
-    return any(r["run_id"] == run_id for r in keep)
+def answer_stale(grace_sec: int, max_age_sec: int, refuse, hand) -> list[dict]:
+    """세션이 grace_sec 안에 받지 않은 답을 작업자로 넘긴다(261103-jipsa-08). 잠금 안에서 받음 표시를 다시 보고 표시까지 하므로 세션과 겹치지 않는다.
+    refuse(줄)는 넘기지 못할 사유이고 hand(줄)는 큐 줄을 만들고 실행ID를 돌려준다. max_age_sec보다 오래됐거나 사유가 있는 답은 worker_skip을 적고 세션 몫으로 둔다."""
+    out = []
+    with inbox_lock():
+        rows = inbox_load()
+        for r in rows:
+            if r.get("kind") == "do" or r.get("delivered") or r.get("worker") or r.get("worker_skip"):
+                continue
+            age = (now() - parse_iso(r["ts"])).total_seconds()
+            if age < grace_sec:
+                continue
+            why = "스케줄러가 꺼져 있던 사이에 넣은 오래된 답이라 자동으로 돌리지 않았다" if age >= max_age_sec else refuse(r)
+            if not why:
+                try:
+                    r["worker_run"] = hand(r)
+                    r["worker"] = now_iso()
+                    out.append(r)
+                except Exception as e:  # noqa: BLE001 - 한 줄의 실패로 나머지 답을 막지 않는다
+                    why = f"작업자로 넘기지 못했다({str(e)[:100]})"
+            if why:
+                r["worker_skip"] = why
+                events.emit("answer_fallback_skip", run=r["run_id"], why=why[:200])
+            inbox_save(rows)  # 한 줄 넘길 때마다 적는다. 중간에 죽어도 넘긴 답을 다시 넘기지 않는다
+    return out
+
+
+def _inbox_cancel(run_id: str) -> dict:
+    """물린 답을 거둔다. 아직 안 받은 답은 받은편지함에서 빼고, 작업자로 넘겼지만 시작하기 전이면 큐 줄도 건너뜀으로 닫는다.
+    delivered는 세션이 이미 받았거나 작업자가 시작해 거둘 수 없는 답이 있다는 뜻이고, worker_run은 그 작업자 실행이다."""
+    out = {"delivered": False, "worker_run": "", "cancelled": ""}
+    with inbox_lock():
+        rows = inbox_load()
+        keep = []
+        for r in rows:
+            if r["run_id"] != run_id:
+                keep.append(r)
+            elif r.get("delivered"):
+                out["delivered"] = True
+                keep.append(r)
+            elif r.get("worker") and r.get("worker_run"):
+                q = queue.by_run(r["worker_run"])
+                if q and q["status"] == queue.PENDING:
+                    queue.update(q["key"], status=queue.SKIPPED, run_id=r["worker_run"], finished=now_iso(), reason="답을 물려 시작하지 않았다", answer=None)
+                    out["cancelled"] = r["worker_run"]  # 빈 실행 폴더는 남긴다. 지우면 다음 실행이 같은 번호를 받아 큐 줄과 섞인다
+                else:
+                    out["delivered"], out["worker_run"] = True, r["worker_run"]
+                    keep.append(r)
+            elif r.get("worker"):
+                out["delivered"] = True
+                keep.append(r)
+        if len(keep) != len(rows):
+            inbox_save(keep)
+    return out
+
+
+def answer_route(run_id: str) -> dict | None:
+    """넣은 답이 지금 어디에 있는지. 결과지 화면이 새로 고친 뒤에도 같은 줄을 보인다. done이 거짓이면 아직 아무도 받지 않은 답이다."""
+    row = next((r for r in reversed(inbox_load()) if r.get("kind") != "do" and r.get("run_id") == run_id), None)
+    if row is None:
+        return None
+    hm = lambda t: str(t or "")[11:16]
+    if row.get("delivered"):
+        return {"done": True, "text": f"세션 {row.get('delivered_to') or ''}이 {hm(row['delivered'])}에 받아 처리한다."}
+    if row.get("worker"):
+        wr = str(row.get("worker_run") or "")
+        st = (meta_of(wr) or {}).get("status") if wr else None
+        return {"done": True, "run": wr, "text": f"세션이 받지 않아 {hm(row['worker'])}에 스케줄러 작업자 {wr}로 넘겼다. 그 실행의 지금 상태는 {st or '시작 대기'}이다."}
+    if row.get("worker_skip"):
+        return {"done": False, "text": f"아직 처리되지 않았다. {row['worker_skip']}. 세션이 열리면 받는다."}
+    return {"done": False, "text": "아직 처리되지 않았다. " + _fallback_tail(str(row.get("project") or ""), parse_iso(row["ts"]))}
 
 
 def session_open(session_run: str) -> bool:
@@ -640,45 +747,72 @@ def session_open(session_run: str) -> bool:
     return bool(meta) and meta.get("status") == "진행 중"
 
 
-def delivery_note(session_run: str = "") -> str:
-    """답을 받은편지함에 넣은 뒤 어디로 가는지 알리는 한 줄. 답 대기 명령이 뜬 세션이 있으면 그 세션에 몇 초 안에 가고,
-    없으면 다음 세션이 열릴 때(대기 명령이나 첫 입력) 전달된다. 08:58의 답이 세션 없이 받은편지함에만 남아 사람이 안 된 줄 알았다(261031-jipsa-01)."""
+def manual_project(name: str) -> bool:
+    """스케줄러가 돌리지 않는 프로젝트(세션 전용이거나 등록부에 없음)인지. 등록부를 읽지 못하면 돌릴 수 있는 것으로 본다."""
+    from scheduler.registry import load_all
+
+    try:
+        project = load_all().get(name)
+    except Exception:  # noqa: BLE001 - 안내 문구 하나 때문에 답 넣기를 막지 않는다
+        return False
+    return project is None or bool(project.manual_only)
+
+
+def _fallback_tail(project: str, ts: datetime | None = None) -> str:
+    """세션이 받지 않을 때 그 답이 어떻게 되는지 한 문장. 스케줄러가 꺼져 있거나 세션 전용 프로젝트면 세션을 기다린다는 것을 그대로 말한다."""
+    from scheduler import supervise
+    from scheduler.config import DO_SESSION_GRACE_SEC
+
+    if manual_project(project):
+        return "세션 전용 프로젝트라 세션이 받을 때까지 기다린다."
+    if not supervise.status().get("alive"):
+        return "스케줄러가 꺼져 있어 세션이 받거나 스케줄러가 켜질 때까지 기다린다."
+    return f"{(ts + timedelta(seconds=DO_SESSION_GRACE_SEC)):%H:%M}까지 세션이 받지 않으면 스케줄러 작업자로 넘긴다." if ts else "2분 안에 세션이 받지 않으면 스케줄러 작업자로 넘긴다."
+
+
+def delivery_note(session_run: str = "", project: str = "") -> str:
+    """답을 받은편지함에 넣은 뒤 어디로 가는지 알리는 한 줄. 답 대기 명령이 뜬 세션이 있으면 그 세션에 몇 초 안에 가고, 2분 안에 아무도 받지 않으면 스케줄러 작업자로 넘어간다.
+    08:58의 답이 세션 없이 받은편지함에만 남아 사람이 안 된 줄 알았고(261031-jipsa-01), 세션이 없어도 답이 처리되게 바꿨다(261103-jipsa-08)."""
     other = open_session()
+    tail = _fallback_tail(project)
     if session_run and session_open(session_run):  # 부모 세션이 아직 열려 있으면 2분 동안 그 세션 몫이다(inbox_take, take_inbox와 같은 규칙)
         if waiter_fresh(session_run):
-            return f"열린 세션 {session_run}에 몇 초 안에 전달된다."
-        return (f"부모 세션 {session_run}이 일하는 중이라 그 세션의 턴 끝이나 다음 입력 때 전달된다."
-                + (f" 2분 안에 받지 않으면 열린 세션 {other}가 받는다." if other and other != session_run else ""))
+            return f"아직 처리되지 않았다. 열린 세션 {session_run}에 몇 초 안에 전달된다. {tail}"
+        return f"아직 처리되지 않았다. 부모 세션 {session_run}이 일하는 중이라 그 세션의 턴 끝이나 다음 입력 때 전달된다. {tail}"
     if other:
-        return f"열린 세션 {other}에 몇 초 안에 전달된다."
-    return "지금 열린 세션이 없어 다음 세션이 열릴 때(jipsa 온이나 답 대기 명령) 전달된다. 답은 받은편지함에 남아 있다."
+        return f"아직 처리되지 않았다. 열린 세션 {other}에 몇 초 안에 전달된다. {tail}"
+    return f"아직 처리되지 않았다. 지금 열린 세션이 없다. {tail}"
+
+
+OTHER_SESSION_AFTER_SEC = 180  # 열린 부모 세션의 답을 다른 세션이 받는 시각. 2분에 스케줄러가 먼저 넘기고, 3분에도 남아 있으면 스케줄러가 꺼진 것이다. hook과 같은 값이다
 
 
 def inbox_take(session_run: str = "") -> list[dict]:
-    """세션이 받을 답을 꺼내 받음 표시를 한다. hook의 take_inbox와 같은 규칙이다. 부모 세션이 열려 있으면 그 세션이 우선이고 2분이 지나면 어느 세션이든 받는다.
+    """세션이 받을 답을 꺼내 받음 표시를 한다. hook의 take_inbox와 같은 규칙이다. 부모 세션이 열려 있으면 그 세션이 우선이고, 2분이 지나면 스케줄러가 작업자로 넘기며, 3분에도 남았거나 자동으로 넘기지 못한 답은 어느 세션이든 받는다.
     부모 세션이 끝났으면 붙들지 않고 바로 받는다(261031-jipsa-01). 이미 받은 답(hook이 넘긴 것 포함)과 작업자로 넘어간 답은 다시 꺼내지 않는다."""
-    rows = inbox_load()
+    if not any(not r.get("delivered") and not r.get("worker") for r in inbox_load()):  # 2초마다 도는 대기 명령이 빈 받은편지함에 잠금을 잡지 않게 먼저 본다
+        return []
     mine = []
     parents: dict[str, bool] = {}
-    for r in rows:
-        if r.get("delivered") or r.get("worker"):
-            continue
-        age = (now() - parse_iso(r["ts"])).total_seconds()
-        parent = r.get("parent_run") or ""
-        if session_run and parent and parent != session_run and age < 120:
-            if parent not in parents:
-                parents[parent] = session_open(parent)
-            if parents[parent]:
+    with inbox_lock():
+        rows = inbox_load()
+        for r in rows:
+            if r.get("delivered") or r.get("worker"):
                 continue
-        r["delivered"] = now_iso()
-        r["delivered_to"] = session_run or "wait-answer"
-        r["delivered_via"] = "wait"
-        mine.append(r)
+            age = (now() - parse_iso(r["ts"])).total_seconds()
+            parent = r.get("parent_run") or ""
+            if session_run and parent and parent != session_run and age < OTHER_SESSION_AFTER_SEC and not r.get("worker_skip"):
+                if parent not in parents:
+                    parents[parent] = session_open(parent)
+                if parents[parent]:
+                    continue
+            r["delivered"] = now_iso()
+            r["delivered_to"] = session_run or "wait-answer"
+            r["delivered_via"] = "wait"
+            mine.append(r)
+        if mine:
+            inbox_save(rows)
     if mine:
-        INBOX.parent.mkdir(parents=True, exist_ok=True)
-        tmp = INBOX.with_suffix(".wait.tmp")  # hook이 읽는 중에도 반쯤 쓰인 파일이 보이지 않게 바꿔치기한다
-        tmp.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
-        os.replace(tmp, INBOX)
         for r in mine:
             events.emit("inbox_delivered", run=session_run or r["run_id"], answered=r["run_id"], via="wait")
         remember_draft(session_run, mine)
@@ -811,7 +945,7 @@ ACK_WORDS = ("확인", "확인함", "ok", "OK")  # 끝난 실행에 이 답만 �
 def answerable(meta: dict) -> bool:
     """결과지에 답 넣기 칸을 열지. 확인 필요는 지금처럼 열고(작업자 실행은 큐 보류일 때만),
     완료와 실패는 아직 답이 없고 확인 필요로 보이면(확인 전) 연다. 확인한 뒤에도 선택지나 보고서 정할 것이 있으면 연다.
-    끝난 실행의 답은 받은편지함으로만 가고 다시 돌리지 않는다. 답을 넣으면 확인한 것이라 완료가 된다(261023-jipsa-26)."""
+    끝난 실행의 답은 받은편지함으로 가고 그 실행을 다시 돌리지 않는다. 세션이 2분 안에 받지 않으면 새 작업자 실행이 잇는다. 답을 넣으면 확인한 것이라 완료가 된다(261023-jipsa-26, 261103-jipsa-08)."""
     st, run_id = meta.get("status"), meta.get("run_id") or ""
     if st == "확인 필요":
         if confirm.acked(run_id, str(meta.get("finished") or "")):  # 답 없이 확인을 누르면 답 칸을 닫는다. 상태 값과 큐 보류는 그대로다
@@ -842,7 +976,7 @@ def _answer_after(meta: dict, text: str, *, close: bool) -> dict:
     note = ""
     if not close:
         inbox_add(meta, text)
-        note = delivery_note(str(meta.get("parent_run") or ""))
+        note = delivery_note(str(meta.get("parent_run") or ""), str(meta.get("project") or ""))
     write_sheet(run_id)
     confirm.ack(run_id, str(meta.get("finished") or ""))  # 답을 넣으면 확인한 것이다
     try:
@@ -857,7 +991,7 @@ def answer(run_id: str, text: str, *, close: bool = False) -> dict:
 
     close면 작업자 실행도 이어 돌리지 않고 완료로 닫는다. 답을 이미 다른 실행이 처리했을 때 쓴다. 큐에서 답을 받아 처리 대기인 실행도 닫을 수 있고,
     세션 받은편지함에 넣지 않으므로 Auto 모드에서 작업자로 다시 돌지 않는다.
-    완료와 실패 실행도 선택지나 정할 것이 있으면 받는다. 주체와 무관하게 다시 돌리지 않고 받은편지함으로 세션에 넘긴다.
+    완료와 실패 실행도 선택지나 정할 것이 있으면 받는다. 주체와 무관하게 그 실행을 다시 돌리지 않고 받은편지함으로 세션에 넘기며, 세션이 2분 안에 받지 않으면 스케줄러가 새 작업자 실행으로 넘긴다(auto.answer_fallback).
     """
     meta = meta_of(run_id)
     if not meta:
@@ -909,7 +1043,7 @@ def answer(run_id: str, text: str, *, close: bool = False) -> dict:
     note = ""
     if not close:
         inbox_add(meta, text, picks)
-        note = delivery_note(str(meta.get("parent_run") or ""))
+        note = delivery_note(str(meta.get("parent_run") or ""), str(meta.get("project") or ""))
     todo_line = ""
     if meta.get("todo_plan"):
         from scheduler import auto, todo
@@ -942,16 +1076,17 @@ def unanswer(run_id: str) -> dict:
             res = read_json(dirs[-1] / "result.json") or {}
             res.pop("answer", None)
             write_json(dirs[-1] / "result.json", res)
-        delivered = _inbox_drop(run_id)
+        gone = _inbox_cancel(run_id)
         confirm.reset(run_id)  # 답을 넣으며 한 확인도 되돌린다. 실패를 확인해 완료로 바꿨다면 실패로 돌아온다
         events.emit("unanswer", run=run_id, was=prev[:120], after=True)
         write_sheet(run_id)
-        return {"ok": True, "was": prev, "delivered": delivered}
+        return {"ok": True, "was": prev, **gone}
     if meta.get("executor", "worker") == "worker":
         return {"ok": False, "why": "스케줄러 작업자 실행은 물릴 수 없다. 이어 돌리기가 시작됐을 수 있다"}
     if not meta.get("answer"):
         return {"ok": False, "why": "넣은 답이 없다"}
     prev = meta.pop("answer")
+    gone = _inbox_cancel(run_id)  # 넘기기가 생겨 받은편지함에 남은 답이 그대로 작업자로 가지 않게 함께 거둔다
     summary = meta.get("summary", "")
     cut = summary.rfind(" 답: ")
     meta.update(status="확인 필요", finished=None, summary=summary[:cut] if cut > 0 else summary, updated=now_iso())
@@ -966,7 +1101,7 @@ def unanswer(run_id: str) -> dict:
         queue.update(row["key"], status=queue.HOLD, run_id=run_id, finished=None, reason=meta["summary"], answer=None)
     events.emit("unanswer", run=run_id, was=prev[:120])
     write_sheet(run_id)
-    return {"ok": True, "was": prev}
+    return {"ok": True, "was": prev, **gone}
 
 
 def close(meta: dict, *, notify: bool = True) -> dict:

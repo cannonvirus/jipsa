@@ -131,6 +131,7 @@ def worker_first(
     handover: bool = False,
     codex: bool = False,
     limits: dict | None = None,
+    draft: bool = False,
 ) -> str:
     commit_rule = (
         f"- 작업이 끝나면 이 브랜치({branch})에 커밋 1개를 만든다. 메시지는 한국어 한 줄과 검증 증거다. 푸시, 병합은 하지 않는다."
@@ -187,6 +188,8 @@ def worker_first(
         "## 추천안으로 가도 되는 범위",
         recommend.strip(),
     ]
+    if draft:
+        parts += ["", "## 초안", "- " + DRAFT_NOTE.format(draft=(run_dir / "draft" / "index.html").as_posix()).replace("jipsa finish가 마감을 막는다", "jipsa가 한 번 돌려보내고, 그래도 비면 확인 필요로 마감한다")]
     local = local_rules()
     if local:
         parts += ["", *local]

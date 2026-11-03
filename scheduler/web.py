@@ -930,6 +930,11 @@ def command(body: dict) -> dict:
                 else:
                     cap = str(body.get("cap") or "").strip()
                     metric, target = (re.sub(r"[\s|]+", " ", str(body.get(k) or "")).strip() for k in ("metric", "target"))
+                    # 숫자가 아닌 값이 지표 낱말로 읽혀 목표 미정이 되거나 상한이 사라지지 않게 먼저 막는다(261103-jipsa-07)
+                    if target and not re.fullmatch(r"-?\d+(?:\.\d+)?\S*", target):
+                        return {"ok": False, "out": f"바꾸지 못했다: 목표값은 숫자로 시작해야 한다({target}).", "cmd": "jipsa todo cycle", "view": todo_view()}
+                    if cap and not cap.isdigit():
+                        return {"ok": False, "out": f"바꾸지 못했다: 상한은 숫자여야 한다({cap}).", "cmd": "jipsa todo cycle", "view": todo_view()}
                     # 하나만 비면 빈 쪽에 미정을 적어 넘긴다. 지표 끝의 숫자가 목표값으로 읽히지 않게 한다
                     if metric and not target:
                         words += [metric, "목표", todofile.PENDING]
@@ -940,6 +945,7 @@ def command(body: dict) -> dict:
                     d = str(body.get("dir") or "").strip()
                     words += [d] if d in ("이상", "이하") else []  # 방향 자동이면 목표값이 있을 때 이상, 비면 분석이 정한다
                     words += ["상한", re.sub(r"\s+", "", cap)] if cap else []
+                    words += ["도달하면", "끝"] if body.get("stop") else []  # 고치기 칸이 끝 조건을 지우지 않게 넘긴다(261103-jipsa-07)
         elif action == "add":
             project, text = str(body.get("project") or "").strip(), re.sub(r"\s+", " ", str(body.get("text") or "")).strip()
             words += [w for w in (project, text) if w]
@@ -951,6 +957,23 @@ def command(body: dict) -> dict:
         with contextlib.redirect_stdout(buf):
             code = fn(Namespace(words=words))
     return {"ok": code == 0, "code": code, "cmd": f"jipsa {head} {' '.join(words)}", "out": buf.getvalue().rstrip("\n"), "view": todo_view()}
+
+
+def new_project(body: dict) -> dict:
+    """TODO 탭의 프로젝트 만들기(261103-jipsa-07). 이름 하나만 받아 /jipsa-register의 무질문 등록과 같은 코드를 부른다.
+    경로와 다른 칸은 요청에서 받지 않는다. 폴더는 늘 jipsa 저장소와 나란한 자리이고, 이름 검사가 상위 폴더 탈출을 막는다."""
+    from scheduler import regedit
+
+    name = body.get("name")
+    with _COMMAND_LOCK:
+        out = regedit.new_project({"name": name if isinstance(name, str) else ""}, cwd=ROOT)
+    if not out["ok"]:
+        return {"ok": False, "text": f"만들지 못했다: {out['why']}", "view": todo_view()}
+    events.emit("registry_create", project=out["project"], by="web")
+    text = f"{out['project']}를 등록했다. {regedit.made_text(out['made']['path'], out['made'])}."
+    if out.get("note"):
+        text += f" 주의: {out['note']}."
+    return {"ok": True, "project": out["project"], "text": text, "view": todo_view()}
 
 
 def state(tab: str = "") -> dict:
@@ -1021,6 +1044,7 @@ def run_detail(run_id: str) -> dict:
     answered = {k: meta.get(k) for k in ("answer", "answered_at", "answered_after")} if meta.get("answer") else None
     if answered:
         answered["images"] = answer_images(meta.get("answer") or "")  # 답 표시의 [Image #N]을 눌러 그림을 연다
+        answered["route"] = record.answer_route(run_id)  # 그 답이 지금 어디에 있는지. 새로 고쳐도 같은 줄을 보인다(261103-jipsa-08)
     answerable = record.answerable(meta)
     choices, notes = record.choices(meta) if answerable else ([], [])
     return {"meta": {**{k: meta.get(k) for k in META_KEYS}, "preview_url": preview_url(meta), "options_auto": bool(meta.get("options_auto"))},
@@ -1275,6 +1299,11 @@ class Handler(BaseHTTPRequestHandler):
                 if self.client_address[0] not in ("127.0.0.1", "::1"):
                     return self._send(403, "로컬에서만 바꾼다".encode("utf-8"), "text/plain; charset=utf-8")
                 return self._json(command(body))
+            if url.path == "/api/project":  # 프로젝트 만들기. 폴더와 등록을 만들므로 로컬 요청만 받고, 다른 사이트의 페이지가 보낸 요청도 거절한다
+                origin = self.headers.get("Origin") or ""
+                if self.client_address[0] not in ("127.0.0.1", "::1") or (origin and urlparse(origin).netloc != self.headers.get("Host")):
+                    return self._send(403, "로컬에서만 바꾼다".encode("utf-8"), "text/plain; charset=utf-8")
+                return self._json(new_project(body))
             if url.path == "/api/gpuqueue":  # GPU 대기열 단추(맨 앞으로, 내리기, 취소). 로컬 요청만 받는다(261026-jipsa-26)
                 if self.client_address[0] not in ("127.0.0.1", "::1"):
                     return self._send(403, "로컬에서만 바꾼다".encode("utf-8"), "text/plain; charset=utf-8")
