@@ -5,41 +5,46 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>jipsa 대시보드</title>
 <!-- 첫 칠 전에 모드를 정한다. 스타일시트보다 앞에 두어야 번쩍이지 않는다. 기본 모드는 THEME_DEFAULT 한 곳이다("dark"로 바꾸면 어두운 모드가 기본이다) -->
-<style>html{background:#fff}html[data-theme="dark"]{background:#1a170f}</style>
+<style>html{background:#fff}html[data-theme="dark"]{background:#1a170f}html[lang="en"]:not([data-i18n]) body{visibility:hidden}</style>
 <script>
 window.THEME_DEFAULT = "light";
+// 화면 언어(261103-misc-14). 기본은 LANG_DEFAULT 한 곳이고, 주소의 ?lang=en이나 ?lang=ko는 저장까지 한다. 영어면 사전을 바르기 전까지 본문을 숨겨 한글이 번쩍이지 않는다
+window.LANG_DEFAULT = "ko";
+(function () { var l = null, q = null; try { q = new URLSearchParams(location.search).get("lang"); } catch (e) { /* 옛 브라우저 */ } if (q === "ko" || q === "en") { l = q; try { localStorage.setItem("jipsa.lang", q); } catch (e) { /* 비공개 창 */ } } else { try { l = localStorage.getItem("jipsa.lang"); } catch (e) { /* 비공개 창 */ } } document.documentElement.setAttribute("lang", l === "en" || l === "ko" ? l : window.LANG_DEFAULT); })();
 (function () { var t = null; try { t = localStorage.getItem("jipsa.theme"); } catch (e) { /* 비공개 창 */ } document.documentElement.setAttribute("data-theme", t === "dark" || t === "light" ? t : window.THEME_DEFAULT); })();
 </script>
 <link rel="stylesheet" href="/style.css">
+<script src="/i18n.js"></script>
 </head>
 <body>
 <!-- 머리 줄 한 줄(261029-jipsa-44, 42 초안 구역 1): 로고, 확인 필요와 진행 중 숫자, 지금 도는 일 한 줄, 오른쪽에 동시 Cycle, GPU 대기(1 이상일 때만), 오늘 보고, 화면 모드 전환, 설정 ⋯.
      새로고침 주기와 Slack 스위치는 설정 메뉴 안으로 옮겼다(구역 20). 옛 상태 줄(.sub.statusbar)은 머리 줄에 합쳤다 -->
 <header class="top">
   <span class="brand">jipsa</span>
-  <div class="counts" id="counts" role="status" aria-label="지금 현황"></div>
+  <div class="counts" id="counts" role="status" aria-label="지금 현황" data-t-attr="aria-label"></div>
   <div class="right">
     <!-- 동시 Cycle 칸(261029-jipsa-17). 도는 Cycle 단계 수와 동시 상한을 보인다 -->
-    <div class="modepill" id="modePill"><span class="dot" id="modeDot"></span><span id="mode">동시 Cycle</span><span class="note" id="cutoffNote"></span></div>
-    <button type="button" class="gqpill" id="gqPill" title="GPU나 RAM이 모자라 기다리는 줄 수. 누르면 TODO 탭의 자원으로 간다" hidden>GPU 대기 <b>0</b></button>
-    <button type="button" id="reportBtn" class="primary">오늘 보고</button>
+    <div class="modepill" id="modePill"><span class="dot" id="modeDot"></span><span id="mode" data-t>동시 Cycle</span><span class="note" id="cutoffNote"></span></div>
+    <button type="button" class="gqpill" id="gqPill" title="GPU나 RAM이 모자라 기다리는 줄 수. 누르면 TODO 탭의 자원으로 간다" data-t-attr="title" hidden><span data-t>GPU 대기</span> <b>0</b></button>
+    <button type="button" id="reportBtn" class="primary" data-t>오늘 보고</button>
     <!-- 화면 모드 전환 버튼(261102-jipsa-47). 한 블럭에 지금 모드만 보이고 누르면 다른 면으로 뒤집힌다. 메뉴에 넣지 않고 좁은 폭에서도 위 줄에 둔다. 바로 뒤 스크립트는 app.js가 오기 전에도 글자가 저장된 모드와 맞게 한다 -->
+    <button type="button" class="theme-flip lang-flip" id="langBtn" data-lang="ko">KOR</button><script>document.getElementById("langBtn").textContent = document.documentElement.getAttribute("lang") === "en" ? "ENG" : "KOR";</script>
     <button type="button" class="theme-flip" id="themeBtn">white</button><script>document.getElementById("themeBtn").textContent = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "white";</script>
-    <button type="button" class="btn-more" id="menuBtn" title="새로고침 주기, Slack 알림, GPU 대기" aria-label="설정" aria-expanded="false" aria-controls="menu">&#8943;</button>
+    <button type="button" class="btn-more" id="menuBtn" title="새로고침 주기, Slack 알림, GPU 대기" aria-label="설정" data-t-attr="title aria-label" aria-expanded="false" aria-controls="menu">&#8943;</button>
   </div>
 </header>
 <div class="menu" id="menu" hidden>
-  <div class="row"><span class="k">새로고침</span><label class="seg" id="pollSeg" title="새로고침 주기"><select id="pollSel" aria-label="새로고침 주기"><option value="5">5초</option><option value="15" selected>15초</option><option value="30">30초</option><option value="60">60초</option><option value="0">멈춤</option></select></label></div>
-  <div class="row"><span class="k">Slack 알림</span><button type="button" class="slacksw" id="slackSw" title="Slack 알림 켜짐/꺼짐" disabled><span class="knob"></span><span id="slackTxt">Slack</span></button></div>
-  <div class="row"><span class="k">GPU 대기</span><button type="button" class="link mono" id="gqMenu" title="누르면 TODO 탭의 자원으로 간다">0줄</button></div>
-  <div class="row ph-only"><span class="k">동시 Cycle</span><span class="mono" id="modeMenu"></span></div>
-  <div class="row ph-only"><span class="k">오늘 보고</span><button type="button" class="primary small" id="reportBtn2">열기</button></div>
+  <div class="row"><span class="k" data-t>새로고침</span><label class="seg" id="pollSeg" title="새로고침 주기" data-t-attr="title"><select id="pollSel" aria-label="새로고침 주기" data-t-attr="aria-label"><option value="5" data-t>5초</option><option value="15" selected data-t>15초</option><option value="30" data-t>30초</option><option value="60" data-t>60초</option><option value="0" data-t="멈춤||poll">멈춤</option></select></label></div>
+  <div class="row"><span class="k" data-t>Slack 알림</span><button type="button" class="slacksw" id="slackSw" title="Slack 알림 켜짐/꺼짐" data-t-attr="title" disabled><span class="knob"></span><span id="slackTxt">Slack</span></button></div>
+  <div class="row"><span class="k" data-t>GPU 대기</span><button type="button" class="link mono" id="gqMenu" title="누르면 TODO 탭의 자원으로 간다" data-t-attr="title">0줄</button></div>
+  <div class="row ph-only"><span class="k" data-t>동시 Cycle</span><span class="mono" id="modeMenu"></span></div>
+  <div class="row ph-only"><span class="k" data-t>오늘 보고</span><button type="button" class="primary small" id="reportBtn2" data-t>열기</button></div>
 </div>
 <!-- 자원 줄(구역 2, 261023-jipsa-41의 한 줄 현황): 이상 경고, Claude와 Codex 쓴 %(5시간 / 주간), GPU, RAM -->
-<div class="res" id="headLine" role="status" aria-label="사용 창과 자원"></div>
-<nav class="tabs" id="tabs" role="tablist" aria-label="화면">
-  <button type="button" role="tab" class="tab" data-tab="board" id="tab-board">현황판</button>
-  <button type="button" role="tab" class="tab" data-tab="timeline" id="tab-timeline">타임라인</button>
+<div class="res" id="headLine" role="status" aria-label="사용 창과 자원" data-t-attr="aria-label"></div>
+<nav class="tabs" id="tabs" role="tablist" aria-label="화면" data-t-attr="aria-label">
+  <button type="button" role="tab" class="tab" data-tab="board" id="tab-board" data-t>현황판</button>
+  <button type="button" role="tab" class="tab" data-tab="timeline" id="tab-timeline" data-t>타임라인</button>
   <button type="button" role="tab" class="tab" data-tab="todo" id="tab-todo">TODO<span class="n" id="tabTodoN" hidden></span></button>
 </nav>
 
@@ -54,58 +59,58 @@ window.THEME_DEFAULT = "light";
     <!-- 카드 아래 두 열(구역 6, 7): 쉬는 프로젝트 한 줄 표와 오늘 끝난 일 최근 5건. 1000px 아래에서는 세로로 쌓인다 -->
     <div class="cols2" id="boardCols" hidden>
       <section class="sec" id="idleSec">
-        <div class="sec-h"><h2>쉬는 프로젝트</h2><span class="n" id="idleN"></span></div>
+        <div class="sec-h"><h2 data-t>쉬는 프로젝트</h2><span class="n" id="idleN"></span></div>
         <table class="rows" id="idleTable"></table>
       </section>
       <section class="sec" id="todaySec">
-        <div class="sec-h"><h2>오늘 끝난 일</h2><span class="n" id="todayN"></span><button type="button" class="lnk" id="reportBtn3">오늘 보고 전체</button></div>
+        <div class="sec-h"><h2 data-t>오늘 끝난 일</h2><span class="n" id="todayN"></span><button type="button" class="lnk" id="reportBtn3" data-t>오늘 보고 전체</button></div>
         <table class="rows" id="todayTable"></table>
-        <p class="empty" id="todayEmpty" hidden>오늘 끝난 일이 아직 없다.</p>
+        <p class="empty" id="todayEmpty" hidden data-t>오늘 끝난 일이 아직 없다.</p>
       </section>
     </div>
-    <p class="empty" id="boardPast" hidden>지난 날짜 기록은 타임라인 탭에서 본다. 실시간을 누르면 돌아온다.</p>
+    <p class="empty" id="boardPast" hidden data-t>지난 날짜 기록은 타임라인 탭에서 본다. 실시간을 누르면 돌아온다.</p>
   </div>
 
   <div class="pane" id="pane-timeline" role="tabpanel" aria-labelledby="tab-timeline" hidden>
   <section class="replay" id="replay" hidden>
-    <button id="play" type="button">재생</button>
-    <input type="range" id="scrub" min="0" max="1000" value="1000" aria-label="재생 위치">
+    <button id="play" type="button" data-t>재생</button>
+    <input type="range" id="scrub" min="0" max="1000" value="1000" aria-label="재생 위치" data-t-attr="aria-label">
     <span class="vnow" id="vnow"></span>
-    <select id="speed" aria-label="재생 속도">
-      <option value="60">1분/초</option>
-      <option value="300" selected>5분/초</option>
-      <option value="900">15분/초</option>
+    <select id="speed" aria-label="재생 속도" data-t-attr="aria-label">
+      <option value="60" data-t>1분/초</option>
+      <option value="300" selected data-t>5분/초</option>
+      <option value="900" data-t>15분/초</option>
     </select>
     <span class="muted" id="replayNote"></span>
   </section>
   <section class="panel timeline">
     <div class="sec-head">
-      <h2>타임라인</h2>
-      <select id="tlWindow" aria-label="보이는 시간 범위"><option value="1">최근 1시간</option><option value="3">최근 3시간</option><option value="6" selected>최근 6시간</option><option value="12">최근 12시간</option><option value="24">최근 24시간</option></select>
+      <h2 data-t>타임라인</h2>
+      <select id="tlWindow" aria-label="보이는 시간 범위" data-t-attr="aria-label"><option value="1" data-t>최근 1시간</option><option value="3" data-t>최근 3시간</option><option value="6" selected data-t>최근 6시간</option><option value="12" data-t>최근 12시간</option><option value="24" data-t>최근 24시간</option></select>
       <!-- 필터 칩(구역 8): 빈 체크박스 대신 색 점과 글자 진하기로 켜짐과 꺼짐을 가른다. 체크박스는 숨기고 값만 쓴다 -->
-      <div class="tlfilter" id="tlFilter" role="group" aria-label="상태 필터, 칩 색이 막대 색이다">
-        <label class="seg" title="진행 중 작업. 진행, 결과 분석, 서칭 단계 이름은 막대에 마우스를 올리면 보인다"><input type="checkbox" value="run"><i class="sw sw-run"></i><span>진행 중</span></label>
-        <label class="seg" title="끝났고 확인한 작업"><input type="checkbox" value="done"><i class="sw sw-done"></i><span>완료</span></label>
-        <label class="seg" title="실패한 작업"><input type="checkbox" value="fail"><i class="sw sw-fail"></i><span>실패</span></label>
-        <label class="seg" title="사람이 확인할 작업이다. 답을 넣을 작업(상태 값 확인 필요)과 끝났는데 아직 확인하지 않은 완료와 실패가 든다. 막대를 눌러 결과지 서랍에서 확인하거나 답을 넣으면 완료가 된다. 답을 넣을 작업은 막대 툴팁과 오른쪽 상태 칸의 물음표로 보인다. 확인하지 않은 실패는 빨간 막대에 주황 테두리다"><input type="checkbox" value="cue"><i class="sw sw-cue"></i><span>확인 필요</span></label>
+      <div class="tlfilter" id="tlFilter" role="group" aria-label="상태 필터, 칩 색이 막대 색이다" data-t-attr="aria-label">
+        <label class="seg" title="진행 중 작업. 진행, 결과 분석, 서칭 단계 이름은 막대에 마우스를 올리면 보인다" data-t-attr="title"><input type="checkbox" value="run"><i class="sw sw-run"></i><span data-t>진행 중</span></label>
+        <label class="seg" title="끝났고 확인한 작업" data-t-attr="title"><input type="checkbox" value="done"><i class="sw sw-done"></i><span data-t>완료</span></label>
+        <label class="seg" title="실패한 작업" data-t-attr="title"><input type="checkbox" value="fail"><i class="sw sw-fail"></i><span data-t>실패</span></label>
+        <label class="seg" title="사람이 확인할 작업이다. 답을 넣을 작업(상태 값 확인 필요)과 끝났는데 아직 확인하지 않은 완료와 실패가 든다. 막대를 눌러 결과지 서랍에서 확인하거나 답을 넣으면 완료가 된다. 답을 넣을 작업은 막대 툴팁과 오른쪽 상태 칸의 물음표로 보인다. 확인하지 않은 실패는 빨간 막대에 주황 테두리다" data-t-attr="title"><input type="checkbox" value="cue"><i class="sw sw-cue"></i><span data-t>확인 필요</span></label>
         <span class="tlhelp">
-          <button type="button" id="tlHelpBtn" aria-expanded="false" aria-controls="tlHelp" title="나머지 표식 설명">?</button>
-          <div class="tlhelp-box" id="tlHelp" role="dialog" aria-label="타임라인 표식 설명" hidden>
-            <div><i class="sw sw-wait"></i>대기: 자원이나 한도를 기다린 구간</div>
-            <div><i class="sw sw-agent"></i>서브에이전트: 막대 아래 얇은 선, 진행 중이면 파랑</div>
-            <div><i class="sw sw-retry">R</i>재시도: 같은 작업을 다시 시도한 시각</div>
-            <div><i class="sw sw-dawn"></i>Auto 마감: Auto 모드가 새 Cycle을 멈추는 시각</div>
-            <div><i class="sw sw-cue-fail"></i>확인 필요(실패): 빨간 막대에 주황 테두리</div>
-            <div><i class="sw sw-run"></i>진행 중 단계 이름은 막대에 마우스를 올리면 보인다</div>
-            <div><i class="sw sw-goal"></i>목표 줄: 목표 cycle마다 한 줄이고 머리에 지금 위치를 적는다. 아래에 Cycle N마다 이행과 분석이 놓이고 맨 끝에 종합 보고 줄이 붙는다. 다음 단계로 넘어간 단계는 자동 확인되어 초록이고, 확인 필요는 종합 보고 줄과 사람이 볼 예외 단계에만 남는다</div>
-            <div><i class="sw sw-done"></i>항목 줄: 프로젝트 줄 아래 항목마다 한 줄이고 검수와 반영은 원 실행 줄에 놓인다</div>
+          <button type="button" id="tlHelpBtn" aria-expanded="false" aria-controls="tlHelp" title="나머지 표식 설명" data-t-attr="title">?</button>
+          <div class="tlhelp-box" id="tlHelp" role="dialog" aria-label="타임라인 표식 설명" data-t-attr="aria-label" hidden>
+            <div><i class="sw sw-wait"></i><span data-t>대기: 자원이나 한도를 기다린 구간</span></div>
+            <div><i class="sw sw-agent"></i><span data-t>서브에이전트: 막대 아래 얇은 선, 진행 중이면 파랑</span></div>
+            <div><i class="sw sw-retry">R</i><span data-t>재시도: 같은 작업을 다시 시도한 시각</span></div>
+            <div><i class="sw sw-dawn"></i><span data-t>Auto 마감: Auto 모드가 새 Cycle을 멈추는 시각</span></div>
+            <div><i class="sw sw-cue-fail"></i><span data-t>확인 필요(실패): 빨간 막대에 주황 테두리</span></div>
+            <div><i class="sw sw-run"></i><span data-t>진행 중 단계 이름은 막대에 마우스를 올리면 보인다</span></div>
+            <div><i class="sw sw-goal"></i><span data-t>목표 줄: 목표 cycle마다 한 줄이고 머리에 지금 위치를 적는다. 아래에 Cycle N마다 이행과 분석이 놓이고 맨 끝에 종합 보고 줄이 붙는다. 다음 단계로 넘어간 단계는 자동 확인되어 초록이고, 확인 필요는 종합 보고 줄과 사람이 볼 예외 단계에만 남는다</span></div>
+            <div><i class="sw sw-done"></i><span data-t>항목 줄: 프로젝트 줄 아래 항목마다 한 줄이고 검수와 반영은 원 실행 줄에 놓인다</span></div>
           </div>
         </span>
       </div>
     </div>
     <div id="goals" class="goals" hidden></div>
     <div id="tl" class="tl"></div>
-    <p class="empty" id="tlEmpty" hidden>최근 24시간에 실행 기록이 없다. 날짜 선택에서 지난 날짜나 데모를 고른다.</p>
+    <p class="empty" id="tlEmpty" hidden data-t>최근 24시간에 실행 기록이 없다. 날짜 선택에서 지난 날짜나 데모를 고른다.</p>
   </section>
   </div>
 
@@ -113,41 +118,41 @@ window.THEME_DEFAULT = "light";
   <!-- TODO 탭(261029-jipsa-17 다안 3차, 261029-jipsa-20). 위 띠는 한 줄 요약이고(구역 11) 펼치면 대기열과 예약 상자(왼쪽)와 Cycle 줄(오른쪽)이 나온다.
        할 일과 메모 칸은 같은 칸 머리와 줄 규칙을 쓴다. 넣기 줄은 제목 아래 왼쪽이고(구역 12) 목록 폭은 넣기 줄과 같은 760px이다(261029-jipsa-43).
        Do는 바로 시키고(Cycle은 마감 칸을 펼친다), 예약은 시각 칸을 펼친다. 지우기와 Cycle 고치기는 줄 끝 ⋯ 메뉴 안이다(구역 13) -->
-  <section class="tfile" id="tfPanel" aria-label="할 일과 도는 Cycle과 메모">
-    <div class="tf-line" id="tfLine" aria-label="대기열과 예약과 Cycle 요약"></div>
+  <section class="tfile" id="tfPanel" aria-label="할 일과 도는 Cycle과 메모" data-t-attr="aria-label">
+    <div class="tf-line" id="tfLine" aria-label="대기열과 예약과 Cycle 요약" data-t-attr="aria-label"></div>
     <div class="tf-band" id="tfBand" hidden>
-      <div class="tf-res" id="tfRes" aria-label="대기열과 예약"></div>
+      <div class="tf-res" id="tfRes" aria-label="대기열과 예약" data-t-attr="aria-label"></div>
       <div class="tf-now" id="tfNow" aria-label="Cycle"></div>
     </div>
     <div class="panel tf-sec" id="tfTodoSec">
       <div class="sec-head tf-head">
-        <h2>할 일</h2><span class="tf-n" id="tfTodoN"></span>
-        <span class="tf-seg" id="tfFilter" role="group" aria-label="할 일 고르기"><button type="button" data-f="all" class="on">전체</button><button type="button" data-f="cycle">Cycle</button><button type="button" data-f="ran" hidden>지난 Cycle</button></span>
+        <h2 data-t>할 일</h2><span class="tf-n" id="tfTodoN"></span>
+        <span class="tf-seg" id="tfFilter" role="group" aria-label="할 일 고르기" data-t-attr="aria-label"><button type="button" data-f="all" class="on" data-t>전체</button><button type="button" data-f="cycle">Cycle</button><button type="button" data-f="ran" hidden>지난 Cycle</button></span>
       </div>
       <form class="tf-ctl tf-add" id="tfAdd" autocomplete="off">
-        <select id="tfProject" aria-label="프로젝트"></select>
-        <input type="text" id="tfText" aria-label="할 일 한 줄" placeholder="할 일 한 줄 | 기준(선택)" title="형식은 할 일 | 기준 | cycle 지표 목표값 이상 상한 N | 한도 VRAM 6GB, RAM 12GB이고 기준부터는 모두 선택이다. cycle 미정이면 첫 분석이 지표와 목표값을 정한다. 넣어도 돌지 않는다">
-        <button type="submit" class="tf-btn" id="tfAddBtn">넣기</button>
+        <select id="tfProject" aria-label="프로젝트" data-t-attr="aria-label"></select>
+        <input type="text" id="tfText" aria-label="할 일 한 줄" placeholder="할 일 한 줄 | 기준(선택)" data-t-attr="aria-label placeholder title" title="형식은 할 일 | 기준 | cycle 지표 목표값 이상 상한 N | 한도 VRAM 6GB, RAM 12GB이고 기준부터는 모두 선택이다. cycle 미정이면 첫 분석이 지표와 목표값을 정한다. 넣어도 돌지 않는다">
+        <button type="submit" class="tf-btn" id="tfAddBtn" data-t>넣기</button>
       </form>
       <form class="tf-ctl tf-add tf-new" id="tfNew" autocomplete="off">
-        <input type="text" id="tfNewName" aria-label="새 프로젝트 이름" placeholder="새 프로젝트 이름 (영문 소문자, 숫자, 밑줄)" title="이름 하나로 jipsa 저장소와 나란한 폴더, git 첫 커밋, 등록까지 만든다">
-        <button type="submit" class="tf-btn" id="tfNewBtn">프로젝트 만들기</button>
+        <input type="text" id="tfNewName" aria-label="새 프로젝트 이름" placeholder="새 프로젝트 이름 (영문 소문자, 숫자, 밑줄)" title="이름 하나로 jipsa 저장소와 나란한 폴더, git 첫 커밋, 등록까지 만든다" data-t-attr="aria-label placeholder title">
+        <button type="submit" class="tf-btn" id="tfNewBtn" data-t>프로젝트 만들기</button>
       </form>
       <div class="tf-new-out" id="tfNewOut" aria-live="polite" hidden></div>
       <div class="tf-placing" id="tfPlacing" aria-live="polite" hidden></div>
       <div class="tf-out" id="tfOutBox" hidden>
-        <div class="tf-out-head"><span class="mono" id="tfCmd"></span><button type="button" class="tf-btn" id="tfOutClose">닫기</button></div>
+        <div class="tf-out-head"><span class="mono" id="tfCmd"></span><button type="button" class="tf-btn" id="tfOutClose" data-t>닫기</button></div>
         <div class="tf-out-body" id="tfOut"></div>
       </div>
       <div class="tf-list" id="tfTodo"></div>
     </div>
     <div class="panel tf-sec" id="memoPanel">
       <div class="sec-head tf-head">
-        <h2>메모</h2><span class="tf-n" id="memoN"></span>
+        <h2 data-t>메모</h2><span class="tf-n" id="memoN"></span>
       </div>
       <form class="tf-ctl tf-add" id="memoAdd" autocomplete="off">
-        <input type="text" id="memoText" aria-label="메모 한 줄" placeholder="떠오른 일 한 줄" title="메모는 돌지 않는다. 프로젝트와 기준은 할 일로 올릴 때 붙인다">
-        <button type="submit" class="tf-btn" id="memoAddBtn">넣기</button>
+        <input type="text" id="memoText" aria-label="메모 한 줄" placeholder="떠오른 일 한 줄" title="메모는 돌지 않는다. 프로젝트와 기준은 할 일로 올릴 때 붙인다" data-t-attr="aria-label placeholder title">
+        <button type="submit" class="tf-btn" id="memoAddBtn" data-t>넣기</button>
       </form>
       <div class="tf-list" id="memoList"></div>
     </div>
@@ -157,31 +162,32 @@ window.THEME_DEFAULT = "light";
 
 <div class="scrim" id="scrim" hidden></div>
 <!-- 결과지 서랍(구역 15~17): 머리에는 초안 보기와 닫기만 두고 원문 링크는 본문 끝으로, 확인 줄은 서랍 바닥 고정 줄로 옮겼다. 본문 폭은 720px이다 -->
-<aside class="drawer" id="drawer" hidden aria-label="보고서">
+<aside class="drawer" id="drawer" hidden aria-label="보고서" data-t-attr="aria-label">
   <div class="drawer-head">
     <div class="drawer-title">
       <span class="stpill" id="drStatus"></span>
-      <span class="tag draft" id="drDraft" hidden title="초안 실행. 결과지가 아니라 초안 보기로 여는 HTML이 결과물이다">초안</span>
+      <span class="tag draft" id="drDraft" hidden title="초안 실행. 결과지가 아니라 초안 보기로 여는 HTML이 결과물이다" data-t-attr="title" data-t>초안</span>
       <span class="name" id="drName"></span>
-      <button type="button" class="name-more" id="drNameMore" aria-controls="drName" aria-expanded="false" hidden>전체 보기</button>
+      <button type="button" class="name-more" id="drNameMore" aria-controls="drName" aria-expanded="false" hidden data-t>전체 보기</button>
       <span class="meta" id="drMeta"></span>
     </div>
     <div class="drawer-tools">
-      <a id="drPreview" class="preview" href="#" target="_blank" rel="noopener" hidden>초안 보기</a>
-      <span class="off" id="drPreviewOff" hidden>미리보기 꺼짐</span>
-      <button type="button" id="drClose" aria-label="닫기">닫기</button>
+      <a id="drPreview" class="preview" href="#" target="_blank" rel="noopener" hidden data-t>초안 보기</a>
+      <span class="off" id="drPreviewOff" hidden data-t>미리보기 꺼짐</span>
+      <button type="button" id="drClose" aria-label="닫기" data-t-attr="aria-label" data-t>닫기</button>
     </div>
   </div>
   <div class="answer" id="drAnswer" hidden>
     <div class="t">확인 필요, 답을 넣을 것. 선택지를 누르거나 직접 적는다.</div>
     <div class="opts" id="drOpts"></div>
-    <form id="drForm"><textarea id="drInput" rows="3" placeholder="답" aria-label="답"></textarea><div class="answer-images" id="drImages" hidden></div><div class="answer-row"><button type="submit">답 넣기</button><span class="muted" id="drAnswerNote"></span><span class="answer-hint">Ctrl+Enter로 넣기, Enter는 줄바꿈, 그림은 Ctrl+V나 Alt+V로 붙인다</span><span class="answer-count" id="drCount">0자</span></div></form>
+    <form id="drForm"><textarea id="drInput" rows="3" placeholder="답" aria-label="답" data-t-attr="placeholder aria-label"></textarea><div class="answer-images" id="drImages" hidden></div><div class="answer-row"><button type="submit" data-t>답 넣기</button><span class="muted" id="drAnswerNote"></span><span class="answer-hint" data-t>Ctrl+Enter로 넣기, Enter는 줄바꿈, 그림은 Ctrl+V나 Alt+V로 붙인다</span><span class="answer-count" id="drCount">0자</span></div></form>
   </div>
-  <div class="drawer-body" id="drScroll"><article class="md" id="drBody"></article><p class="rawline" id="drRawLine"><a id="drRaw" href="#" target="_blank" rel="noopener">원문 열기</a></p></div>
+  <div class="drawer-body" id="drScroll"><p class="lang-note" id="drLangNote" hidden data-t>결과지 본문은 작업자가 한국어로 쓴 원문이라 번역하지 않는다.</p><article class="md" id="drBody"></article><p class="rawline" id="drRawLine"><a id="drRaw" href="#" target="_blank" rel="noopener" data-t>원문 열기</a></p></div>
   <div class="drawer-foot" id="drFoot" hidden></div>
 </aside>
 
 <div id="tip" class="tip" role="tooltip" hidden></div>
+<script>window.applyStatic();</script>
 <script src="/app.js"></script>
 </body>
 </html>
