@@ -9,20 +9,22 @@ uv sync
 claude
 ```
 
-받은 폴더에서 Claude Code를 켜면 세션이 `CLAUDE.md`, 스킬, 훅을 읽는다. 복사할 파일은 없다. 처음 열 때 폴더 신뢰 확인에 동의한다. 훅은 `uv sync`가 만든 가상환경으로 돌므로 `uv sync`를 먼저 한다. 자세한 내용은 [Claude Code 연계](claude-code.md)다.
+`uv sync`는 `.venv`를 만들고 `uv.lock`에 적힌 버전을 깐다. `jipsa` 명령도 여기서 생긴다. 가상환경은 직접 만들지 않는다. `.venv`는 git에 들어가지 않고 `uv sync`나 `uv run`이 `pyproject.toml`과 `uv.lock`을 읽어 만든다. Claude Code 훅과 상태 줄이 `.venv`의 파이썬을 바로 부르므로, 이 폴더에서 Claude Code를 열기 전에 `uv sync`를 한 번 돌린다.
+
+받은 폴더에서 Claude Code(`claude`)를 켜면 세션이 `CLAUDE.md`, 스킬, 훅을 읽는다. 복사할 파일은 없고, 지울 때도 폴더만 지우면 된다([제거](#제거)). 처음 열 때 폴더 신뢰 확인에 동의한다. 훅은 `uv sync`가 만든 가상환경으로 돌므로 `uv sync`를 먼저 한다. 훅이 턴 끝을 막거나 코드 수정을 거절하는 이유와 끄는 법을 포함한 자세한 내용은 [Claude Code 연계](claude-code.md)다.
 
 아래는 필요할 때만 한다.
 
-- `.env`: Slack 웹훅이나 모델을 파일로 정하려면 `.env.example`을 `.env`로 복사해 채운다. 없어도 돈다. Slack 웹훅이 비어 있으면 보고는 `reports/`에만 남는다. `.env`는 git에 넣지 않는다. `.env`에 적은 값은 설정 스킬로 저장한 값보다 앞선다([설정](#설정)).
+- `.env`: Slack 연결 주소나 모델을 파일로 정하려면 `copy .env.example .env`(PowerShell)로 복사해 채운다. 없어도 돈다. Slack 연결 주소가 비어 있으면 Slack 없이 보고가 `reports/`에만 남는다. `.env`는 git에 넣지 않는다. `.env`에 적은 값은 설정 스킬로 저장한 값보다 앞선다([설정](#설정)).
 - `uv run jipsa sync-agents`: Codex 작업자를 쓸 때 `RULES.md`에서 `AGENTS.md`를 만든다.
 - `npm install -g ccstatusline`: 상태줄 글자를 찍는다([상태줄](claude-code.md#상태줄)).
-- `uv run jipsa check`: 환경을 점검한다. 줄마다 `[OK]`, `[선택]`, `[확인]`이 붙고 `[확인]`이 하나라도 있으면 종료 코드 1이다. `codex`, `nvidia-smi`, `AGENTS.md`, Slack 웹훅, 예시 등록부의 경로는 없어도 `[선택]`이라 종료 코드에 영향이 없다. 처음 복제한 PC에서 `claude`, `uv`, `git` 줄이 `[OK]`이고 종료 코드가 0이면 정상이다.
+- `uv run jipsa check`: 환경을 점검한다. 줄마다 `[OK]`, `[선택]`, `[확인]`이 붙고 `[확인]`이 하나라도 있으면 종료 코드 1이다. `codex`, `nvidia-smi`, `AGENTS.md`, Slack 연결, 예시 등록부의 경로는 없어도 `[선택]`이라 종료 코드에 영향이 없다. 처음 복제한 PC에서 `claude`, `uv`, `git` 줄이 `[OK]`이고 종료 코드가 0이면 정상이다.
 
 Claude Code CLI가 경로에 있어야 세션과 작업자가 돈다. Codex CLI는 없으면 Codex 관련 기능(분석자, Codex 작업자, Codex 창 표시)만 빠진다. NVIDIA GPU와 `nvidia-smi`도 선택이며, 없으면 GPU 메모리를 요구하는 작업만 돌지 못한다.
 
 ## Monitor와 반대 검토 공급자
 
-`python monitor.py`는 대시보드와 스케줄러를 보여 주는 콘솔 메뉴다. 위쪽에 서비스마다 상태, PID, 포트, 주소가 나오고, 대시보드와 스케줄러는 단축키 하나로 함께 켜기, 끄기, 다시 켜기를 한다. 끄면 대시보드 감시가 스케줄러를 다시 띄우지 않고, 켜면 그 멈춤이 풀린다. 실행 중 작업이 있으면 끄기와 다시 켜기는 묻지 않고 거절만 한다. 서비스는 창 없는 프로세스라 Monitor 창을 닫아도 돈다. 서비스 목록은 `scheduler/services.toml`이다.
+`uv run python monitor.py`는 대시보드와 스케줄러를 한 메뉴에서 켜고 끄는 콘솔 메뉴다. 위쪽에 서비스마다 상태, PID, 포트, 주소가 나오고, 대시보드와 스케줄러는 단축키 하나로 함께 켜기, 끄기, 다시 켜기를 한다. 끄면 대시보드 감시가 스케줄러를 다시 띄우지 않고, 켜면 그 멈춤이 풀린다. 실행 중 작업이 있으면 끄기와 다시 켜기는 묻지 않고 거절만 한다. 서비스는 창 없는 프로세스라 Monitor 창을 닫아도 돈다. 서비스 목록은 `scheduler/services.toml`이다. 설정은 이 폴더에서 연 Claude Code 세션의 스킬로 넣는다([설정](#설정)).
 
 마감 전 반대 검토는 `/jipsa-model`의 마감 전 공격 공급자(`JIPSA_ATTACK_PROVIDER`)로 고른다. 기본은 `codex`이고 Codex CLI가 없으면 `none`과 같게 돌아 검토 없이 마감한다. `claude`는 작업자와 같은 계열 모델이 도구와 웹 없이 한 번 검토하며 결과지에 같은 공급자 공격이라고 적힌다. 공급자가 `codex`가 아니거나 Codex가 없으면 사용 창 표시의 Codex 칸이 숨겨지고, `jipsa check`의 codex 줄은 선택 항목으로 나온다.
 
@@ -71,14 +73,14 @@ Auto 모드는 없어졌다. `uv run jipsa auto`는 없어졌다는 안내와 �
 | 스킬 | 다루는 값 |
 | --- | --- |
 | `/jipsa-register` | 프로젝트 만들기(이름 하나, 질문 없음), 고치기(`edit`, 질문으로 받음), 보기(`show`) |
-| `/jipsa-slack` | Webhook 주소, 시험 글(`test`), 아침 요약 시각, 알림 켜짐 |
+| `/jipsa-slack` | Slack 연결 주소(Webhook URL), 시험 글(`test`), 아침 요약 시각, 알림 켜짐 |
 | `/jipsa-model` | 작업자 모델, 가벼운 호출 모델, Codex 모델, 마감 전 공격 공급자 |
 | `/jipsa-config` | 동시 작업 수, 자동 작업 동시 수, Ollama 주소, 자료 폴더, 되돌리기(`undo`) |
 | `/jipsa-cleanup` | 기록 보관 기한 셋, 중간 산출물 정리 |
 
 - 지금 값은 `uv run jipsa settings show`로 본다. 비밀값은 설정됨 여부만 보인다. `/jipsa-slack`, `/jipsa-model`, `/jipsa-config`, `/jipsa-cleanup`은 `show`를 붙이면 묻지 않고 그 값만 보인다.
-- 값은 상태 폴더의 `config.json`에 저장한다. `.env`나 환경 변수에 있는 값이 앞서므로 그 칸은 `.env`를 고쳐야 바뀐다. Webhook 주소와 알림 켜짐은 이 파일에 들지 않아 `/jipsa-config undo`로 되돌아가지 않는다.
-- 저장한 값은 스케줄러와 대시보드를 다시 띄워야 반영된다. 스킬이 다시 띄울지 묻고 `uv run jipsa settings restart`를 돌린다. 등록은 스케줄러가 주기마다 다시 읽으므로 등록 직후에도 다시 띄울 필요가 없고, Webhook 주소와 알림 켜짐은 바로 반영된다. `restart`는 마지막 작업이 끝난 뒤에도 실행 중 작업 수가 한 주기(약 1분) 늦게 갱신되어 "실행 중 작업이 있다"고 거절할 수 있다. 1분쯤 뒤 다시 돌린다. `restart`와 Monitor는 포트를 듣는 대시보드가 이 저장소와 같은 상태 폴더로 돌 때만 끄고, 아니면 끄지 않고 이유를 찍는다. 이미 다른 대시보드가 8765를 쓰면 `JIPSA_WEB_PORT`를 다른 값으로 주고 띄운다.
+- 값은 상태 폴더의 `config.json`에 저장한다. `.env`나 환경 변수에 있는 값이 앞서므로 그 칸은 `.env`를 고쳐야 바뀐다. Slack 연결 주소와 알림 켜짐은 이 파일에 들지 않아 `/jipsa-config undo`로 되돌아가지 않는다.
+- 저장한 값은 스케줄러와 대시보드를 다시 띄워야 반영된다. 스킬이 다시 띄울지 묻고 `uv run jipsa settings restart`를 돌린다. 등록은 스케줄러가 주기마다 다시 읽으므로 등록 직후에도 다시 띄울 필요가 없고, Slack 연결 주소와 알림 켜짐은 바로 반영된다. `restart`는 마지막 작업이 끝난 뒤에도 실행 중 작업 수가 한 주기(약 1분) 늦게 갱신되어 "실행 중 작업이 있다"고 거절할 수 있다. 1분쯤 뒤 다시 돌린다. `restart`와 Monitor는 포트를 듣는 대시보드가 이 저장소와 같은 상태 폴더로 돌 때만 끄고, 아니면 끄지 않고 이유를 찍는다. 이미 다른 대시보드가 8765를 쓰면 `JIPSA_WEB_PORT`를 다른 값으로 주고 띄운다.
 - 스케줄러만 끄려면 `uv run jipsa settings stop`이다. 대시보드 감시가 다시 띄우지 않고, `uv run jipsa settings start`나 `restart`가 멈춤을 푼다. 실행 중 작업이 있으면 거절하며, `--force`를 주면 스케줄러가 띄운 작업 프로세스까지 끊고 그 줄은 다음 시작 때 대기로 돌아간다. 세션 서브에이전트 작업은 스케줄러 밖이라 끊지 않는다.
 - 대시보드 오른쪽 위 메뉴에는 새로고침 주기와 Slack 알림 스위치, GPU 대기 표시가 있다.
 
