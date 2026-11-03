@@ -25,10 +25,11 @@ from pathlib import Path
 import psutil
 
 from scheduler import supervise
-from scheduler.config import ROOT, STATE, redact
+from scheduler.config import ROOT, RUNTIME, STATE, redact
 from scheduler.nowindow import BACKGROUND, BREAKAWAY, hidden
 
 SERVICES_FILE = Path(os.environ.get("JIPSA_SERVICES", "").strip() or Path(__file__).with_name("services.toml"))
+STATE_DEFAULT = RUNTIME / "state"  # JIPSA_STATE_DIR를 주지 않은 프로세스가 쓰는 상태 폴더
 LOG_DIR = STATE / "monitor"
 DASH_LOG = LOG_DIR / "dashboard.log"
 LOG_LINES = 300  # 로그 칸이 기본으로 보이는 끝줄 수
@@ -68,6 +69,30 @@ def _listener(port: int) -> psutil.Process | None:
     except (psutil.Error, OSError):
         pass
     return None
+
+
+def _norm(path) -> str:
+    return os.path.normcase(os.path.realpath(str(path)))
+
+
+def foreign_reason(p: psutil.Process) -> str:
+    """포트를 듣는 대시보드가 이 저장소와 이 상태 폴더 소속인지 본다. 소속이면 빈 문자열, 아니면 끄지 않을 이유다.
+    다른 폴더의 복제본이나 다른 상태 폴더로 도는 대시보드를 끄지 않기 위한 확인이다. 읽지 못하면 소속을 모르므로 끄지 않는다."""
+    try:
+        cwd = p.cwd()
+    except (psutil.Error, OSError) as e:
+        return f"작업 폴더를 읽지 못해 소속을 알 수 없다({type(e).__name__})"
+    if _norm(cwd) != _norm(ROOT):
+        return f"작업 폴더가 {cwd}라 이 저장소({ROOT})의 대시보드가 아니다"
+    try:
+        env = p.environ()
+    except (psutil.Error, OSError) as e:
+        return f"환경을 읽지 못해 상태 폴더를 알 수 없다({type(e).__name__})"
+    given = env.get("JIPSA_STATE_DIR", "").strip()
+    theirs = Path(given) if given else STATE_DEFAULT
+    if _norm(theirs) != _norm(STATE):
+        return f"상태 폴더가 {theirs}라 지금 쓰는 상태 폴더({STATE})와 다르다"
+    return ""
 
 
 def _kill(pids: list[int]) -> list[int]:
@@ -203,6 +228,10 @@ def _dash_stop(s: dict) -> str:
     info = _dash_info(s)
     if not info["up"]:
         return "떠 있지 않다"
+    p = _proc(info["pids"][0])
+    why = foreign_reason(p) if p else ""
+    if why:
+        return f"끄지 않았다(pid {info['pids'][0]}). {why}"
     left = _kill(info["pids"])
     return f"끄지 못한 프로세스가 남았다(pid {left})" if left else f"껐다(pid {info['pids'][0]})"
 

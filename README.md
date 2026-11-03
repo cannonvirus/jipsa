@@ -35,7 +35,7 @@ uv run jipsa web              # 대시보드 http://127.0.0.1:8765/ (터미널�
 claude                        # 다른 터미널의 같은 폴더에서
 ```
 
-받은 폴더에서 Claude Code를 켜면 세션이 안내, 스킬, 훅을 읽으므로 복사할 파일은 없다. 처음 열 때 폴더 신뢰 확인에 동의한다. 세션에서 저장소를 하나 등록한 뒤 일을 넣는다.
+받은 폴더에서 Claude Code를 켜면 세션이 안내, 스킬, 훅을 읽으므로 복사할 파일은 없고, 지울 때도 폴더만 지우면 된다([제거](docs/getting-started.md#제거)). 처음 열 때 폴더 신뢰 확인에 동의한다. 세션에서 저장소를 하나 등록한 뒤 일을 넣는다.
 
 ```text
 /jipsa-register my_app
@@ -88,7 +88,7 @@ Slack, Codex, 상태줄처럼 필요할 때만 하는 단계, 임시 폴더로 �
 | `jipsa attack` | 마감 전 반대 검토를 돌린다. 공급자는 설정에서 codex, claude, none 가운데 고른다 |
 | `jipsa runs`, `jipsa result` | 지난 작업 목록과 결과지 전문 |
 | `jipsa status`, `jipsa report` | 지금 상태와 오늘 보고 |
-| `jipsa check` | 환경 점검. Codex는 선택 항목이라 없어도 종료 코드에 영향이 없다 |
+| `jipsa check` | 환경 점검. Codex, GPU, Slack, AGENTS.md는 선택 항목이라 없어도 종료 코드가 0이다 |
 | `python monitor.py` | 콘솔 Monitor. 대시보드와 스케줄러를 한 단축키로 함께 켜고, 끄고, 다시 켠다 |
 
 ## 폴더

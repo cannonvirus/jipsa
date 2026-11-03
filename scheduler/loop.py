@@ -82,6 +82,17 @@ class Scheduler:
         t.start()
         self.wait_since.pop(key, None)
 
+    def _reload_registry(self) -> None:
+        """주기마다 등록부를 다시 읽는다. 스케줄러가 켜진 뒤 등록한 프로젝트도 다음 주기부터 돈다. 읽지 못하면 앞 값을 쓴다."""
+        try:
+            fresh = load_all()
+        except Exception as e:  # noqa: BLE001 - 고치던 중인 등록부 한 파일로 루프를 멈추지 않는다
+            events.emit("error", where="registry_reload", error=str(e)[:300])
+            return
+        if set(fresh) != set(self.registry):
+            events.emit("registry_reload", added=sorted(set(fresh) - set(self.registry)), removed=sorted(set(self.registry) - set(fresh)))
+        self.registry = fresh
+
     def _session_hold(self, project) -> str:
         """원본 폴더에서 도는 doc 프로젝트에 세션이나 서브에이전트 실행이 진행 중이면 그 실행ID를 돌려준다. 같은 폴더를 쓰는 등록부도 같이 본다."""
         if project.uses_worktree:
@@ -118,6 +129,7 @@ class Scheduler:
             HEARTBEAT.write_text(json.dumps({"pid": os.getpid(), "last_tick": now_iso(), "concurrency": self.concurrency, "running": len(self.threads)}), encoding="utf-8")
         except OSError:
             pass
+        self._reload_registry()
         for gone in resources.expire():
             events.emit("lease_expire", run=gone.get("run"))
         # 결과 없이 상한을 넘긴 세션 실행을 닫는다. 남겨 두면 원본 폴더 작업이 세션 실행 대기로 계속 밀린다

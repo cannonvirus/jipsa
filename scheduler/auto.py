@@ -131,7 +131,7 @@ def skip_sheet(it: todo.Todo, why: str, mode: dict) -> str:
     project = it.project if it.project else "jipsa"
     run_id = record.new_run_id(project)
     fix = {NO_CRITERIA: "기준 칸을 적어 다시 시킨다",
-           NO_PROJECT: "등록부에 있는 프로젝트 이름으로 고쳐 다시 올린다",
+           NO_PROJECT: "줄의 프로젝트 이름이 등록부 파일 이름과 같은지 본다. 같으면 등록 직후 스케줄러가 아직 읽지 못한 것이므로 한 주기 뒤 다시 시킨다",
            MANUAL_ONLY: "세션에서 바로 시킨다"}.get(why, "고쳐 다시 올린다")
     cause = {NO_CRITERIA: "기준(완료 기준) 칸이 없어 돌리지 않았다",
              NO_PROJECT: "등록부에 없는 프로젝트라 돌리지 않았다",

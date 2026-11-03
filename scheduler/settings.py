@@ -287,6 +287,10 @@ def restart(force: bool = False, port: int = 0) -> dict:
     listener = monitor._listener(port)
     if listener and not monitor._is_dashboard(listener):
         return {"ok": False, "why": f"{port} 포트를 다른 프로그램이 쓴다. 다시 띄우지 않았다"}
+    if listener:
+        why = monitor.foreign_reason(listener)
+        if why:
+            return {"ok": False, "why": f"{port} 포트 대시보드(pid {listener.pid})를 끄지 않았다. {why}. 이 저장소의 대시보드를 따로 띄우려면 JIPSA_WEB_PORT를 다른 값으로 준다"}
     dash_pid = listener.pid if listener else 0
     supervise.unhold()
     env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8", "JIPSA_LIVE": "1"}

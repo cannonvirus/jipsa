@@ -1306,17 +1306,18 @@ def cmd_check(args) -> int:
     _print("jipsa 점검")
     for tool in ("claude", "codex", "uv", "git", "nvidia-smi"):
         path = shutil.which(tool)
-        line(tool, bool(path), path or ("없음" if tool != "codex" else "없음. 선택 항목이고 공격 공급자 codex는 none과 같게 돈다"), optional=tool == "codex")
+        none = {"codex": "없음. 선택 항목이고 공격 공급자 codex는 none과 같게 돈다", "nvidia-smi": "없음. GPU는 선택 항목이다. GPU를 쓰는 작업만 영향을 받는다"}.get(tool, "없음")
+        line(tool, bool(path), path or none, optional=tool in ("codex", "nvidia-smi"))
     line("RULES.md", RULES_FILE.exists())
-    line("AGENTS.md(RULES.md 사본)", AGENTS_FILE.exists(), "" if AGENTS_FILE.exists() else "jipsa sync-agents로 만든다")
+    line("AGENTS.md(RULES.md 사본)", AGENTS_FILE.exists(), "" if AGENTS_FILE.exists() else "Codex 작업자를 쓸 때만 필요하다. jipsa sync-agents로 만든다", optional=True)
     line("policies/claude_settings.json", SETTINGS_FILE.exists())
-    line("Slack Webhook", bool(SLACK_WEBHOOK), "" if SLACK_WEBHOOK else ".env의 JIPSA_SLACK_WEBHOOK이 비어 있다. 보고는 reports/에만 남는다")
+    line("Slack Webhook", bool(SLACK_WEBHOOK), "" if SLACK_WEBHOOK else ".env의 JIPSA_SLACK_WEBHOOK이 비어 있다. 보고는 reports/에만 남는다", optional=True)
     try:
         reg = load_all()
         line("등록부", bool(reg), f"{len(reg)}개: {', '.join(reg)}")
         for p in reg.values():
             if not p.path.exists():
-                line(f"  {p.name} 경로", False, str(p.path))
+                line(f"  {p.name} 경로", False, str(p.path) + (" (예시 등록부라 내 프로젝트를 등록하면 지워도 된다)" if p.name == "example_app" else ""), optional=p.name == "example_app")
             if p.questions:
                 _print(f"    {p.name} 확인 필요: " + " / ".join(p.questions))
     except Exception as e:  # noqa: BLE001
