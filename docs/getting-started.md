@@ -16,9 +16,9 @@ claude
 - `.env`: Slack 웹훅이나 모델을 파일로 정하려면 `.env.example`을 `.env`로 복사해 채운다. 없어도 돈다. Slack 웹훅이 비어 있으면 보고는 `reports/`에만 남는다. `.env`는 git에 넣지 않는다. `.env`에 적은 값은 설정 스킬로 저장한 값보다 앞선다([설정](#설정)).
 - `uv run jipsa sync-agents`: Codex 작업자를 쓸 때 `RULES.md`에서 `AGENTS.md`를 만든다.
 - `npm install -g ccstatusline`: 상태줄 글자를 찍는다([상태줄](claude-code.md#상태줄)).
-- `uv run jipsa check`: 환경을 점검한다.
+- `uv run jipsa check`: 환경을 점검한다. 줄마다 `[OK]`, `[선택]`, `[확인]`이 붙고 `[확인]`이 하나라도 있으면 종료 코드 1이다. `codex`, `nvidia-smi`, `AGENTS.md`, Slack 웹훅, 예시 등록부의 경로는 없어도 `[선택]`이라 종료 코드에 영향이 없다. 처음 복제한 PC에서 `claude`, `uv`, `git` 줄이 `[OK]`이고 종료 코드가 0이면 정상이다.
 
-Claude Code CLI가 경로에 있어야 세션과 작업자가 돈다. Codex CLI는 없으면 Codex 관련 기능(분석자, Codex 작업자, Codex 창 표시)만 빠진다.
+Claude Code CLI가 경로에 있어야 세션과 작업자가 돈다. Codex CLI는 없으면 Codex 관련 기능(분석자, Codex 작업자, Codex 창 표시)만 빠진다. NVIDIA GPU와 `nvidia-smi`도 선택이며, 없으면 GPU 메모리를 요구하는 작업만 돌지 못한다.
 
 ## Monitor와 반대 검토 공급자
 
@@ -46,6 +46,15 @@ uv run jipsa web --port 8798 --no-open --no-watch
 2. 할 일을 넣는다. `uv run jipsa todo add "<이름> <할 일> | <완료 기준>"`이나 대시보드 TODO 탭으로 넣는다. 형식은 [todo.md](todo.md)다. 넣은 할 일은 그대로는 돌지 않고, `uv run jipsa todo run <번호>`로 시킨 줄만 돈다.
 3. `uv run jipsa web`으로 대시보드를 켠다. 대시보드가 스케줄러를 함께 띄우고, 스케줄러가 시킨 줄을 worktree와 기능 브랜치에서 작업자로 돌린다. 자동 범위는 기능 브랜치 커밋까지이고 푸시는 하지 않는다.
 
+등록한 저장소에서 처음 일을 돌릴 때는 그 저장소에 `.gitignore`가 있는지 본다. 없으면 작업자가 만든 컴파일 캐시(`__pycache__/`)나 가상환경이 커밋에 들어갈 수 있다. 예는 아래와 같다.
+
+```
+.venv/
+__pycache__/
+*.pyc
+.env
+```
+
 ## 일을 시키는 길
 
 사람이 시킨 일만 돈다. 시키는 길은 줄 종류에 따라 둘이다.
@@ -69,7 +78,7 @@ Auto 모드는 없어졌다. `uv run jipsa auto`는 없어졌다는 안내와 �
 
 - 지금 값은 `uv run jipsa settings show`로 본다. 비밀값은 설정됨 여부만 보인다. `/jipsa-slack`, `/jipsa-model`, `/jipsa-config`, `/jipsa-cleanup`은 `show`를 붙이면 묻지 않고 그 값만 보인다.
 - 값은 상태 폴더의 `config.json`에 저장한다. `.env`나 환경 변수에 있는 값이 앞서므로 그 칸은 `.env`를 고쳐야 바뀐다. Webhook 주소와 알림 켜짐은 이 파일에 들지 않아 `/jipsa-config undo`로 되돌아가지 않는다.
-- 저장한 값은 스케줄러와 대시보드를 다시 띄워야 반영된다. 스킬이 다시 띄울지 묻고 `uv run jipsa settings restart`를 돌린다. 등록은 스케줄러가 다음 주기에 읽고, Webhook 주소와 알림 켜짐은 바로 반영된다.
+- 저장한 값은 스케줄러와 대시보드를 다시 띄워야 반영된다. 스킬이 다시 띄울지 묻고 `uv run jipsa settings restart`를 돌린다. 등록은 스케줄러가 주기마다 다시 읽으므로 등록 직후에도 다시 띄울 필요가 없고, Webhook 주소와 알림 켜짐은 바로 반영된다. `restart`는 마지막 작업이 끝난 뒤에도 실행 중 작업 수가 한 주기(약 1분) 늦게 갱신되어 "실행 중 작업이 있다"고 거절할 수 있다. 1분쯤 뒤 다시 돌린다. `restart`와 Monitor는 포트를 듣는 대시보드가 이 저장소와 같은 상태 폴더로 돌 때만 끄고, 아니면 끄지 않고 이유를 찍는다. 이미 다른 대시보드가 8765를 쓰면 `JIPSA_WEB_PORT`를 다른 값으로 주고 띄운다.
 - 스케줄러만 끄려면 `uv run jipsa settings stop`이다. 대시보드 감시가 다시 띄우지 않고, `uv run jipsa settings start`나 `restart`가 멈춤을 푼다. 실행 중 작업이 있으면 거절하며, `--force`를 주면 스케줄러가 띄운 작업 프로세스까지 끊고 그 줄은 다음 시작 때 대기로 돌아간다. 세션 서브에이전트 작업은 스케줄러 밖이라 끊지 않는다.
 - 대시보드 오른쪽 위 메뉴에는 새로고침 주기와 Slack 알림 스위치, GPU 대기 표시가 있다.
 
@@ -84,6 +93,15 @@ Auto 모드는 없어졌다. `uv run jipsa auto`는 없어졌다는 안내와 �
 ## 테스트할 때 주의
 
 에이전트 셸(Claude Code, Codex 안)에서 운영 상태 폴더로 스케줄러 루프, 모의 실행, 기본 포트가 아닌 대시보드를 띄우면 `jipsa`가 막는다. 테스트면 위처럼 `JIPSA_STATE_DIR`, `JIPSA_RUNS_DIR`, `JIPSA_REPORTS_DIR`를 임시 폴더로 주고, 운영으로 돌릴 것이 맞으면 `JIPSA_LIVE=1`을 준다.
+
+## 제거
+
+jipsa는 이 폴더 밖에 파일을 쓰지 않는다. 스킬 8개(`jipsa`, `jipsa-register`, `jipsa-slack`, `jipsa-model`, `jipsa-config`, `jipsa-cleanup`, `todo`, `auto`)는 이 폴더의 `.claude/skills/`에만 있고 `~/.claude/skills/`에 복사하지 않는다. 그래서 스킬 제거는 따로 없고, 폴더를 지우면 스킬도 사라진다. 사용자 전역에 같은 이름의 스킬을 직접 넣었다면 그 폴더(`~/.claude/skills/<이름>`)를 지운다.
+
+1. 대시보드와 스케줄러를 끈다. `python monitor.py`에서 끄거나 `uv run jipsa settings stop`을 돌리고, 대시보드 터미널은 Ctrl+C로 닫는다.
+2. 등록한 저장소에 남은 worktree는 `uv run jipsa worktrees`로 보고 `uv run jipsa worktrees --remove <이름>`으로 지운다. 기능 브랜치는 지우지 않으니 필요 없으면 각 저장소에서 `git branch -D`로 지운다.
+3. 이 폴더를 지운다. 기록(`runs/`, `reports/`, `runtime/`)도 함께 지워진다. 남기려면 먼저 복사한다.
+4. `npm install -g ccstatusline`을 했다면 `npm uninstall -g ccstatusline`으로 뺀다.
 
 ## 그림 찍기
 
