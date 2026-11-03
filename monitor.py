@@ -45,13 +45,13 @@ if __name__ == "__main__" and (_py := venv_python()) and not _in_venv(_py):
 # sys.path에 루트를 넣은 뒤라야 import된다 (monitor.py는 패키지 밖에 있다)
 sys.path.insert(0, str(ROOT))
 
-import time  # noqa: E402
-import unicodedata  # noqa: E402
-from collections.abc import Callable  # noqa: E402
-from dataclasses import dataclass, field, replace  # noqa: E402
-from datetime import datetime  # noqa: E402
+import time
+import unicodedata
+from collections.abc import Callable
+from dataclasses import dataclass, field, replace
+from datetime import datetime
 
-from scheduler import monitor as svc  # noqa: E402
+from scheduler import monitor as svc
 
 _LOG_LINES = (40, 300)  # 로그 화면의 끝줄 수. l로 바꾼다
 _LINE = 72
@@ -82,22 +82,19 @@ def _label(name: str) -> str:
 
 
 def _act_group(group: str, action: str) -> None:
-    """묶음 전체를 켜고, 끄고, 다시 켠다. 실행 중 작업이 있으면 먼저 거절하고, y로 답하면 그 작업을 끊고 한다."""
+    """묶음 전체를 켜고, 끄고, 다시 켠다. 실행 중 작업이 있으면 묻지 않고 거절한다."""
     g = next(x for x in svc.groups() if x["name"] == group)
     rows = {s["name"]: s for s in svc.state()}
     running = sum(rows[n]["running"] for n in g["members"])
     word = {"start": "켜기", "stop": "끄기", "restart": "다시 켜기"}[action]
     print(f"\n{g['label']} {word}")
     print("-" * _LINE)
-    force = False
     if action != "start" and running:
-        if input(f"  실행 중 작업 {running}개가 있어 기본은 거절합니다. 작업을 끊고 계속할까요? (y/N) ").strip().lower() != "y":
-            print("  취소했습니다. 작업이 끝난 뒤에 다시 고르세요.")
-            _wait()
-            return
-        force = True
+        print(f"  실행 중 작업 {running}개가 있어 거절합니다. 작업이 끝난 뒤에 다시 고르세요.")
+        _wait()
+        return
     print("  하는 중...")
-    print(f"  {svc.act_group(group, action, force=force)['message']}")
+    print(f"  {svc.act_group(group, action)['message']}")
     after = {s["name"]: s for s in svc.state()}
     for n in g["members"]:
         print(f"  지금: {_label(n)} {_status_word(after[n])}  PID {', '.join(map(str, after[n]['pids'])) or '-'}")
