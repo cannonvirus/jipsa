@@ -6,7 +6,7 @@
 
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB) ![Windows 11](https://img.shields.io/badge/OS-Windows%2011-0078D4) ![License MIT](https://img.shields.io/badge/license-MIT-green)
 
-한국어 | English(준비 중)
+[한국어](README.md) | [English](README.en.md)
 
 ![현황판 화면](docs/img/dashboard-board.png)
 
