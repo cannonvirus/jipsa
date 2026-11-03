@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 STATE = Path(os.environ["JIPSA_STATE_DIR"]) if os.environ.get("JIPSA_STATE_DIR") else ROOT / "runtime" / "state"  # 시험용으로 바꾼다(scheduler.config와 같다)
 EVENTS = STATE / "events.jsonl"
 INBOX = STATE / "session_inbox.jsonl"  # 세션이 하던 일에 들어온 답(record.answer가 쓴다)
+INBOX_LOCK = STATE / "session_inbox.lock"  # scheduler.record.inbox_lock과 같은 잠금이다. 스케줄러가 작업자로 넘기는 답과 겹치지 않게 잡는다
 RUNS = Path(os.environ["JIPSA_RUNS_DIR"]) if os.environ.get("JIPSA_RUNS_DIR") else ROOT / "runs"  # 시험용
 CHAT_LIMIT = int(os.environ.get("JIPSA_CHAT_LIMIT", "").strip() or 300)  # 메인 세션 마지막 답의 글자 수 한도. 넘으면 턴 끝에서 한 번 막는다(261025-jipsa-13 나안)
 # 결론 문장 표지(261025-jipsa-31). 300자 한도만으로는 짧은 판정과 원인 설명이 지나갔다. 길이와 무관하게 이 꼴이 마지막 답에 있으면 턴 끝을 한 번 막는다.
@@ -389,33 +390,71 @@ def draft_note(meta: dict, text: str, via: str) -> str:
     return d.note(d.remember(meta, text, via))
 
 
+class inbox_lock:
+    """scheduler.record.inbox_lock과 같은 규칙의 파일 잠금. hook은 scheduler를 들이지 않으므로 따로 둔다."""
+
+    def __enter__(self):
+        STATE.mkdir(parents=True, exist_ok=True)
+        for _ in range(300):
+            try:
+                os.close(os.open(INBOX_LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+                return self
+            except (FileExistsError, PermissionError):
+                try:
+                    if time.time() - INBOX_LOCK.stat().st_mtime > 10:
+                        INBOX_LOCK.unlink()
+                except OSError:
+                    pass
+                time.sleep(0.05)
+        return self
+
+    def __exit__(self, *exc):
+        try:
+            INBOX_LOCK.unlink()
+        except OSError:
+            pass
+
+
 def take_inbox(run_id: str, meta: dict | None = None) -> str:
-    """이 세션에 넘길 답을 꺼내 전달 표시를 하고 안내문을 돌려준다. 부모 세션이 열려 있으면 그 세션이 우선이고 2분이 지나면 어느 세션이든 받는다.
+    """이 세션에 넘길 답을 꺼내 전달 표시를 하고 안내문을 돌려준다. 부모 세션이 열려 있으면 그 세션이 우선이고, 2분이 지나면 스케줄러가 작업자로 넘기며, 3분에도 남았거나 자동으로 넘기지 못한 답은 어느 세션이든 받는다.
     부모 세션이 끝났으면 붙들지 않고 바로 받는다(261031-jipsa-01).
     meta를 주면 답에 든 초안 요청을 그 세션 기록에 남기고 결과지 초안이면 안내 줄을 붙인다. 쓰기는 부른 쪽이 한다."""
-    try:
+    try:  # 받을 답이 없는 대부분의 호출은 잠금을 잡지 않는다
         rows = [json.loads(l) for l in INBOX.read_text(encoding="utf-8").splitlines() if l.strip()]
     except (OSError, ValueError):
         return ""
-    mine, changed, parents = [], False, {}
-    for r in rows:
-        if r.get("delivered") or r.get("worker"):
-            continue
-        age = (datetime.now() - datetime.fromisoformat(r["ts"])).total_seconds()
-        parent = r.get("parent_run") or ""
-        if parent and parent != run_id and age < 120:
-            if parent not in parents:
-                parents[parent] = parent_open(parent)
-            if parents[parent]:
+    if not any(not r.get("delivered") and not r.get("worker") for r in rows):
+        return ""
+    mine, parents = [], {}
+    with inbox_lock():
+        try:
+            rows = [json.loads(l) for l in INBOX.read_text(encoding="utf-8").splitlines() if l.strip()]
+        except (OSError, ValueError):
+            return ""
+        for r in rows:
+            if r.get("delivered") or r.get("worker"):
                 continue
-        r["delivered"] = now_iso()
-        r["delivered_to"] = run_id
-        mine.append(r)
-        changed = True
-    if changed:
-        tmp = INBOX.with_suffix(f".{os.getpid()}.tmp")
-        tmp.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in rows), encoding="utf-8")
-        os.replace(tmp, INBOX)
+            age = (datetime.now() - datetime.fromisoformat(r["ts"])).total_seconds()
+            parent = r.get("parent_run") or ""
+            if parent and parent != run_id and age < 180 and not r.get("worker_skip"):  # record.OTHER_SESSION_AFTER_SEC와 같다
+                if parent not in parents:
+                    parents[parent] = parent_open(parent)
+                if parents[parent]:
+                    continue
+            r["delivered"] = now_iso()
+            r["delivered_to"] = run_id
+            mine.append(r)
+        if mine:
+            tmp = INBOX.with_suffix(f".{os.getpid()}.tmp")
+            tmp.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in rows), encoding="utf-8")
+            for n in range(20):
+                try:
+                    os.replace(tmp, INBOX)
+                    break
+                except PermissionError:
+                    if n == 19:
+                        raise
+                    time.sleep(0.05)
     if not mine:
         return ""
     dos = [r for r in mine if r.get("kind") == "do"]  # 대시보드 Do와 jipsa todo run이 세션에 보낸 할 일 줄(261026-jipsa-26)

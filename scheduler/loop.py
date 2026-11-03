@@ -6,7 +6,7 @@
 동시 실행(261026-jipsa-26): 일회성 줄은 개수로 막지 않고, Cycle 단계와 기준 정하기는 합쳐 AUTO_CAP(6)개까지다. 사용 창 비율로는 멈추지 않는다(261102-jipsa-50).
 2초마다 요청 목록, 할 일 파일, 모드 파일이 바뀌었거나
 끝난 작업자가 있는지 보고, 있으면 30초 주기를 기다리지 않고 한 바퀴를 돈다. 주기마다 GPU와 RAM 실측과 장부를 맞추고(resources.reconcile,
-resources.reconcile_ram), 세션이 받지 않은 Do 요청을 작업자로 넘기며(auto.do_fallback), 아침 시각이 지나면 밤 사이 끝난 Cycle 모음 글을
+resources.reconcile_ram), 세션이 받지 않은 Do 요청과 답을 작업자로 넘기며(auto.do_fallback, auto.answer_fallback), 아침 시각이 지나면 밤 사이 끝난 Cycle 모음 글을
 하루 한 번 보낸다(auto.morning_digest).
 작업마다 보내는 Slack 요약 글(확인 필요와 실패만)과 결과지는 실행기가 기록 계층(record.close)으로 처리하므로 여기서는 보내지 않는다.
 """
@@ -160,6 +160,10 @@ class Scheduler:
             auto.do_fallback()  # 세션이 2분 안에 받지 않은 Do 요청은 작업자로 넘긴다
         except Exception as e:  # noqa: BLE001
             events.emit("error", where="do_fallback", error=str(e)[:300])
+        try:
+            auto.answer_fallback()  # 결과지에 넣은 답도 세션이 2분 안에 받지 않으면 새 작업자 실행으로 넘긴다
+        except Exception as e:  # noqa: BLE001
+            events.emit("error", where="answer_fallback", error=str(e)[:300])
         try:
             # runs 중간 산출물 정리. JIPSA_RUNS_CLEAN_ON=1일 때만 하루 한 번 휴지통 폴더로 옮긴다. 기본은 꺼짐이다(261028-jipsa-10)
             done = runsclean.maybe_auto()

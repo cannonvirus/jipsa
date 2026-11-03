@@ -430,8 +430,14 @@ def cmd_answer(args) -> int:
 
     if args.undo:
         out = record.unanswer(args.run_id)
-        _print(f"답을 물렸다: {out.get('was')}" + (" (이미 세션에 넘어간 답이 있다)" if out.get("delivered") else "") if out.get("ok") else f"물리지 못했다: {out.get('why')}")
-        return 0 if out.get("ok") else 1
+        if not out.get("ok"):
+            _print(f"물리지 못했다: {out.get('why')}")
+            return 1
+        extra = f" 작업자 실행 {out['cancelled']}는 시작 전이라 함께 거뒀다." if out.get("cancelled") else ""
+        extra += (f" 작업자 실행 {out['worker_run']}가 이미 시작해 거두지 못했다. 필요하면 그 실행을 멈춘다." if out.get("worker_run")
+                  else " 이미 세션에 넘어간 답이 있다." if out.get("delivered") else "")
+        _print(f"답을 물렸다: {out.get('was')}.{extra}")
+        return 0
     out = record.answer(args.run_id, args.answer, close=args.close)
     if not out.get("ok"):
         _print(f"넣지 못했다: {out.get('why')}")
@@ -439,8 +445,8 @@ def cmd_answer(args) -> int:
     if out.get("acked"):
         _print("확인했다. 확인 필요에서 빠지고 완료로 보인다. 답은 남기지 않았다.")
         return 0
-    if out.get("after"):  # 끝난 실행의 답은 다시 돌리지 않고 받은편지함으로만 간다. 답을 넣으면 확인한 것이라 확인 필요에서 빠지고 실패였으면 완료가 된다
-        _print("끝난 실행에 답을 적었다. 확인 필요에서 빠지고 완료로 보이며 다시 돌리지 않는다." + ("" if args.close else " 세션이 받은편지함에서 받아 처리한다. " + out.get("delivery", "")))
+    if out.get("after"):  # 끝난 실행의 답은 그 실행을 다시 돌리지 않고 받은편지함으로 간다. 답을 넣으면 확인한 것이라 확인 필요에서 빠지고 실패였으면 완료가 된다
+        _print("끝난 실행에 답을 적었다. 확인 필요에서 빠지고 완료로 보이며 그 실행은 다시 돌리지 않는다." + ("" if args.close else " " + out.get("delivery", "")))
         return 0
     if out.get("todo"):  # 기준 정하기 결과지의 답(261025-jipsa-24)
         _print(f"답한 기준을 할 일 줄에 적었다. 돌리려면 jipsa todo run으로 시킨다: {out['todo']}")
@@ -448,7 +454,7 @@ def cmd_answer(args) -> int:
     if args.close:
         _print("답을 기록에 적고 완료로 닫았다. 스케줄러가 이어 돌리지 않는다.")
         return 0
-    _print("답을 넣었다. 스케줄러가 다음 확인 주기에 이어 돌린다." if out.get("resume") else "답을 기록에 적고 완료로 닫았다. 세션이 이어서 처리한다. " + out.get("delivery", ""))
+    _print("답을 넣었다. 스케줄러가 다음 확인 주기에 이어 돌린다." if out.get("resume") else "답을 기록에 적고 완료로 닫았다. " + out.get("delivery", ""))
     return 0
 
 
@@ -594,9 +600,11 @@ def _registry_write(args) -> int:
                 return 1
             items.remove(val.strip())
         values[fid] = "\n".join(items)
+    made = None
     if args.action == "new":
         values["name"] = args.project
-        out = regedit.create(values, dry_run=args.check)
+        out = regedit.new_project(values, check=args.check)
+        made = out.get("made")
     else:
         out = regedit.save(args.project, values, dry_run=args.check)
     if not out["ok"]:
@@ -609,6 +617,8 @@ def _registry_write(args) -> int:
         else:
             events.emit("registry_create", project=out["project"])
             _print(f"등록 {out['project']}를 만들었다. 다시 읽어 칸 {out['fields_read']}개가 읽힌다. 스케줄러는 다음 주기에 새 등록을 읽는다")
+            if made:
+                _print(f"{regedit.made_text(made['path'], made)}. 대시보드 TODO 탭에서 이 프로젝트로 일을 넣는다")
     else:
         for d in out["diff"]:
             _print(d)
@@ -635,9 +645,7 @@ def cmd_registry(args) -> int:
             return 0
         v = regedit.fields_view(args.project)
         if not v["ok"]:
-            from scheduler.config import ROOT
-
-            _print(f"{v['why']}. 새 등록의 경로 기본값은 {(ROOT.parent / args.project).as_posix()}다")
+            _print(f"{v['why']}. 새 등록의 경로 기본값은 {regedit.default_repo(args.project).as_posix()}다")
             return 1
         for f in v["fields"]:
             value = f["value"].replace("\n", ", ") if f["value"] else f"(비움, 기본값 {f['default'] or '없음'})"
@@ -902,6 +910,10 @@ def cmd_begin(args) -> int:
         except todo.TodoError as e:
             _print(f"시작하지 않았다: --todo 줄을 찾지 못했다({e})")
             return 1
+    # Do로 시킨 단발 줄의 문장에 초안 요청이 있으면 --draft와 같다(261103-jipsa-07). 스케줄러 작업자 경로는 auto.entry가 같은 판정을 쓴다
+    line_draft = bool(todo_item is not None and not args.no_draft and not args.draft and not todo_item.cycle
+                      and draftask.line_wants(project.name, todo_item.text, todo_item.criteria))
+    draft = draft or line_draft
     parent = ""
     if args.parent:  # 할 일 줄, 메모, 실행 기록 제목에서 찾아 meta의 parent_item에만 건다
         try:
@@ -960,6 +972,7 @@ def cmd_begin(args) -> int:
     if draft:
         _print("초안 실행: 결과지 '초안 보기'로 열 HTML 초안과 result.json preview_url이 있어야 마감된다"
                + (f" (사람 입력 \"{ask['text'][:60]}\"에서 표시했다. 초안이 아닌 일이면 --no-draft로 다시 연다)" if sheet_ask and not args.draft else "")
+               + (f" (할 일 줄 \"{todo_item.text[:60]}\"에서 표시했다. 초안이 아닌 일이면 --no-draft로 다시 연다)" if line_draft else "")
                + ". 아래 규격의 초안 줄을 서브에이전트 지시에 넣는다")
     if args.executor == "subagent":  # 대화 요약 뒤 모델 지정이 빠지지 않게 세션에 매번 알린다(261102-jipsa-33)
         _print(f"Agent 호출 model: 인자에 {args.model}을(를) 명시한다. 생략하면 세션 모델을 물려받는다" if args.model
@@ -1460,7 +1473,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("words", nargs=argparse.REMAINDER, help="동작과 인자. 따옴표 없이 여러 낱말로 와도 공백으로 합친다")
     s.set_defaults(fn=cmd_todo)
 
-    s = sub.add_parser("answer", help="확인 필요에 답을 넣어 이어 돌린다. 선택지나 정할 것이 있는 완료와 실패 실행은 답을 받은편지함으로 세션에 넘긴다. --undo로 답을 물린다")
+    s = sub.add_parser("answer", help="확인 필요에 답을 넣어 이어 돌린다. 선택지나 정할 것이 있는 완료와 실패 실행은 답을 받은편지함으로 세션에 넘기고, 세션이 2분 안에 받지 않으면 작업자로 넘긴다. --undo로 답을 물린다")
     s.add_argument("run_id")
     s.add_argument("answer", nargs="?", default="")
     s.add_argument("--undo", action="store_true", help="잘못 넣은 답을 물린다. 확인 필요였던 실행은 확인 필요로 되돌리고(세션과 서브에이전트 실행만), 끝난 실행은 답만 지운다")
@@ -1478,7 +1491,7 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--dry-run", action="store_true", help="쓰지 않고 더할 줄만 보인다")
     a = rs.add_parser("show", help="등록 목록, 또는 이름을 주면 그 등록의 칸 19개와 값")
     a.add_argument("project", nargs="?", default="", help="등록 이름")
-    a = rs.add_parser("new", help="새 등록을 만든다. 메인 세션 전용. 예: registry new ocr_new path=~/code/ocr_new kind=experiment")
+    a = rs.add_parser("new", help="새 등록을 만든다. 메인 세션 전용. 이름만 주면 폴더를 만들고 git 첫 커밋까지 하며 종류는 code다. 있는 폴더는 건드리지 않고 등록한다. path를 주면 폴더를 만들지 않는다. 예: registry new my_app")
     a.add_argument("project", help="등록 이름. 영문 소문자, 숫자, 밑줄")
     a.add_argument("pairs", nargs="*", help="'칸=값'. 칸은 scope.auto 꼴이나 자동 범위 같은 한글 이름이다. 목록 칸은 '칸+=값'으로 더한다")
     a.add_argument("--check", action="store_true", help="쓰지 않고 만들 글만 보인다")

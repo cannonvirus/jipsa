@@ -41,7 +41,7 @@ uv run jipsa web --port 8798 --no-open --no-watch
 
 ## 내 프로젝트 등록
 
-1. Claude Code 세션에서 `/jipsa-register <이름>`을 부른다. 이름은 영문 소문자, 숫자, 밑줄만 쓴다. 경로, 종류, 자동 범위, 커밋 여부, GPU 메모리를 차례로 묻고(종류가 doc이면 허용 폴더까지) `projects/<이름>.toml`을 쓴다. 고치기는 `/jipsa-register <이름> edit`이다. 형식은 [registry.md](registry.md)다. 저장소에 든 등록부는 예시 `example_app`과 기타 일을 받는 `misc` 2개뿐이고, 새 등록부는 `.gitignore`가 막아 git에 들어가지 않는다.
+1. 대시보드 TODO 탭의 **프로젝트 만들기** 칸에 이름을 넣거나, Claude Code 세션에서 `/jipsa-register <이름>`을 부른다. 둘 다 묻지 않고 같은 코드로 돈다. 이름은 영문 소문자, 숫자, 밑줄만 쓴다. 이 저장소와 나란한 자리에 폴더를 만들어 git 첫 커밋을 하고, 기본값(종류 code, 기능 브랜치 커밋까지)으로 `projects/<이름>.toml`을 쓴다. 같은 이름의 폴더가 있으면 건드리지 않고 등록한다. 값을 고치려면 `/jipsa-register <이름> edit`이다. 형식은 [registry.md](registry.md)다. 저장소에 든 등록부는 예시 `example_app`과 기타 일을 받는 `misc` 2개뿐이고, 새 등록부는 `.gitignore`가 막아 git에 들어가지 않는다.
    손으로 쓰려면 `projects/example_app.toml`을 복사해 편집기로 고친다. 세션의 편집 도구로 고치면 코드 보호 훅이 거절한다([훅](claude-code.md#훅)).
 2. 할 일을 넣는다. `uv run jipsa todo add "<이름> <할 일> | <완료 기준>"`이나 대시보드 TODO 탭으로 넣는다. 형식은 [todo.md](todo.md)다. 넣은 할 일은 그대로는 돌지 않고, `uv run jipsa todo run <번호>`로 시킨 줄만 돈다.
 3. `uv run jipsa web`으로 대시보드를 켠다. 대시보드가 스케줄러를 함께 띄우고, 스케줄러가 시킨 줄을 worktree와 기능 브랜치에서 작업자로 돌린다. 자동 범위는 기능 브랜치 커밋까지이고 푸시는 하지 않는다.
@@ -59,7 +59,7 @@ __pycache__/
 
 사람이 시킨 일만 돈다. 시키는 길은 줄 종류에 따라 둘이다.
 
-- 일회성 줄: `uv run jipsa todo run <번호>`나 대시보드의 Do 단추로 바로 돈다. 열린 세션이 있으면 세션 서브에이전트가, 없으면 스케줄러 작업자가 맡는다.
+- 일회성 줄: `uv run jipsa todo run <번호>`나 대시보드의 Do 단추로 바로 돈다. 열린 세션이 있으면 세션 서브에이전트가, 없으면 스케줄러 작업자가 맡는다. 결과지에 넣은 답도 같아서 세션이 2분 안에 받지 않으면 스케줄러 작업자가 잇는다.
 - Cycle 줄(cycle 칸이 있는 줄): `uv run jipsa todo run <번호> [시작 HH:MM] [마감 HH:MM|+4h]`로 시작과 마감을 정한다. 시작 기본값은 지금이다. 멈추기는 `uv run jipsa todo stop <번호>`, 마감 고치기는 `uv run jipsa todo until <번호> <HH:MM|+4h>`다.
 
 Auto 모드는 없어졌다. `uv run jipsa auto`는 없어졌다는 안내와 지금 상태만 찍고, `on`, `off`, `add`, `top`, `rm`은 아무것도 바꾸지 않고 종료 코드 1로 끝난다.
@@ -70,7 +70,7 @@ Auto 모드는 없어졌다. `uv run jipsa auto`는 없어졌다는 안내와 �
 
 | 스킬 | 다루는 값 |
 | --- | --- |
-| `/jipsa-register` | 프로젝트 등록 만들기, 고치기(`edit`), 보기(`show`) |
+| `/jipsa-register` | 프로젝트 만들기(이름 하나, 질문 없음), 고치기(`edit`, 질문으로 받음), 보기(`show`) |
 | `/jipsa-slack` | Webhook 주소, 시험 글(`test`), 아침 요약 시각, 알림 켜짐 |
 | `/jipsa-model` | 작업자 모델, 가벼운 호출 모델, Codex 모델, 마감 전 공격 공급자 |
 | `/jipsa-config` | 동시 작업 수, 자동 작업 동시 수, Ollama 주소, 자료 폴더, 되돌리기(`undo`) |

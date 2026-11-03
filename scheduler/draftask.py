@@ -26,6 +26,21 @@ def kind(text: str) -> str:
     return SHEET if text and DRAFT_WORD.search(text) else ""
 
 
+# 할 일 줄의 초안 판정(261103-jipsa-07). 초안 기능이나 파일 이름을 말하는 자리는 요청으로 세지 않는다.
+# '초안 보기 고쳐 줘'는 기능 수정이고 '초안 보기로 보여 줘'는 요청이라 조사 로, 에가 붙은 꼴은 빼지 않는다
+_FEATURE = re.compile(r"초안\s*(?:보기|단추|버튼|표식|기능|판정|인식|검사|마감|주소|경로|실행|요청)(?![로에으])")
+_FILE_NAME = re.compile(r"[\w./\\-]*초안[\w./\\-]*\.[A-Za-z0-9]+|초안_\w+")
+
+# 있는 초안을 읽거나 요약하는 말은 새 초안 요청이 아니다. 놓치면 주소 검사만 빠지고, 잘못 잡으면 확인 필요로 멈추므로 이쪽으로 좁힌다
+_READING = re.compile(r"(?:지난|기존|이전|앞선|만든|받은|옛)\s*초안|초안(?:을|의|에서)?\s*(?:읽|요약|검토|분석|비교|참고)")
+
+
+def line_wants(project: str, text: str, criteria: str = "") -> bool:
+    """Do로 시킨 단발 줄이 결과지 초안을 바라는지. begin --draft와 같게 처리할 줄이다."""
+    rest = _READING.sub(" ", _FILE_NAME.sub(" ", _FEATURE.sub(" ", f"{text} {criteria}")))
+    return kind(rest) == SHEET
+
+
 def now_iso() -> str:
     return datetime.now().replace(microsecond=0).isoformat(timespec="seconds")
 

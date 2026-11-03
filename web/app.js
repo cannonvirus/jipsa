@@ -812,6 +812,7 @@
   document.addEventListener("pointerup", () => { setTimeout(() => { tfBandPress = false; }, 0); }, true);
   let tfFilt = "all"; // 할 일 칸 고르기: all, cycle
   let tfDo = null; // 펼친 Do나 예약 칸 {key, rsv, start, until}. rsv가 참이면 예약이다
+  let tfCyc = null; // 펼친 Cycle 값 칸 {key, metric, target, dir, cap, stop}
   function tfButton(label, title, onClick, danger) {
     const b = el("button", `tf-btn${danger ? " danger" : ""}`, label); b.type = "button"; b.title = title;
     b.addEventListener("click", onClick);
@@ -843,6 +844,7 @@
         if (name === "todo run" && (rsv || (r.cells && r.cells.cycle))) { // 예약과 Cycle Do는 줄 아래 칸을 펼치고 닫는다
           const same = tfDo && tfDo.key === r.item.key && tfDo.rsv === rsv;
           tfDo = same ? null : { key: r.item.key, rsv, start: rsv ? "" : "지금", until: "07:00" };
+          tfCyc = null;
           tfTodoSig = ""; drawTodoFile(state.data && state.data.todofile); return;
         }
         if (name === "todo run" && !window.confirm(`이 줄 하나를 지금 작업자로 돌린다. 시키면 할 일에서 빠지고 현황판에 보인다.\n\n${r.text.trim()}`)) return;
@@ -854,6 +856,7 @@
         bs.appendChild(b);
       } else { b.textContent = "지우기"; more.push(b); } // Rm은 ⋯ 메뉴 안이다
     }
+    if (r.cells) more.push(tfCycEditBtn(r));
     if (r.cells && r.cells.cycle) more.push(tfFbBtn(r)); // 사람 피드백(261026-jipsa-19). 입력 줄 없이 프롬프트 창 하나
     if (r.cells) more.push(tfCycBtn(r));
     if (more.length) bs.appendChild(tfMore(r.item.key, more));
@@ -901,6 +904,40 @@
     });
     if (on) { b.classList.add("on"); b.setAttribute("aria-pressed", "true"); } else b.setAttribute("aria-pressed", "false");
     return b;
+  }
+  // Cycle 값 고치기(261103-jipsa-07). 지표, 목표값, 방향, 상한, 끝 조건을 줄 아래 칸에서 고친다. 비운 칸은 첫 분석이 정한다. 도는 줄은 서버가 거절한다
+  function tfCycEditBtn(r) {
+    const v = r.cells.cycle;
+    return tfButton(v ? "Cycle 값 고치기" : "Cycle 값 넣기", `지표, 목표값, 상한을 고친다 (jipsa todo cycle ${r.item.no} <지표> <목표값> 상한 N)`, () => {
+      closeTfMenu();
+      const p = tfCycParse(v) || {}, same = tfCyc && tfCyc.key === r.item.key;
+      tfCyc = same ? null : { key: r.item.key, metric: p.metric || "", target: p.target || "", dir: p.dir || "", cap: p.cap || "", stop: /도달하면 끝$/.test(v || "") };
+      tfDo = null; tfTodoSig = ""; drawTodoFile(state.data && state.data.todofile);
+    });
+  }
+  function tfCycForm(r) {
+    const f = el("form", "tf-do tf-cyc"); f.autocomplete = "off";
+    const inp = (k, label, ph) => {
+      const i = el("input", null); i.type = "text"; i.value = tfCyc[k]; i.placeholder = ph; i.setAttribute("aria-label", label);
+      i.addEventListener("input", () => { tfCyc[k] = i.value; });
+      f.appendChild(el("span", "k", label)); f.appendChild(i); return i;
+    };
+    const first = inp("metric", "지표", "첫 화면 ms");
+    inp("target", "목표값", "800");
+    const d = el("select", null); d.setAttribute("aria-label", "방향");
+    for (const [v, t] of [["", "방향 자동"], ["이상", "이상"], ["이하", "이하"]]) { const o = el("option", null, t); o.value = v; d.appendChild(o); }
+    d.value = tfCyc.dir; d.addEventListener("change", () => { tfCyc.dir = d.value; }); f.appendChild(d);
+    inp("cap", "상한", "4");
+    const lb = el("label", "k"), c = el("input", null); c.type = "checkbox"; c.checked = tfCyc.stop;
+    c.addEventListener("change", () => { tfCyc.stop = c.checked; }); lb.append(c, " 도달하면 끝"); f.appendChild(lb);
+    const ok = el("button", "tf-btn do", "저장"); ok.type = "submit"; f.appendChild(ok);
+    f.appendChild(tfButton("취소", "고치기 칸을 닫는다", () => { tfCyc = null; tfTodoSig = ""; drawTodoFile(state.data && state.data.todofile); }));
+    f.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      tfRun({ name: "todo cycle", key: r.item.key, metric: tfCyc.metric.trim(), target: tfCyc.target.trim(), dir: tfCyc.dir, cap: tfCyc.cap.trim(), stop: tfCyc.stop }, "tfTodoSec");
+    });
+    setTimeout(() => first.focus(), 0);
+    return f;
   }
   function tfFbBtn(r) {
     return tfButton("피드백", `Cycle의 돌고 있는 단계와 다음 분석, 명령에 사람 피드백을 넣는다. 지표와 목표값은 바뀌지 않는다 (jipsa todo feedback ${r.item.no} | 글)`, () => {
@@ -1103,6 +1140,7 @@
           dot.appendChild(el("i")); dot.append(c.status); note.appendChild(dot); main.appendChild(note);
         }
         if (tfDo && r.item && tfDo.key === r.item.key) main.appendChild(tfDoForm(r));
+        if (tfCyc && r.item && tfCyc.key === r.item.key) main.appendChild(tfCycForm(r));
         row.appendChild(main);
         row.appendChild(tfBtns(r));
       } else { // 칸으로 나누지 못한 줄은 줄 글 그대로 둔다
@@ -1143,8 +1181,9 @@
     $("tfFilter").hidden = !nc && !nr; // 고를 것이 없으면 숨긴다
     for (const x of document.querySelectorAll("#tfFilter button")) x.classList.toggle("on", x.dataset.f === tfFilt);
     if (tfDo && !all.some((r) => r.item && r.item.key === tfDo.key)) tfDo = null;
+    if (tfCyc && !all.some((r) => r.item && r.item.key === tfCyc.key)) tfCyc = null;
     const focus = document.activeElement, typing = focus && $("tfTodo").contains(focus) && focus.tagName === "INPUT";
-    const tSig = JSON.stringify([tRows, tfDo && tfDo.key]);
+    const tSig = JSON.stringify([tRows, tfDo && tfDo.key, tfCyc && tfCyc.key]);
     if (tSig !== tfTodoSig && !typing) { // 입력 중인 값을 주기 새로 그리기가 지우지 않게 한다
       tfList($("tfTodo"), tRows, tfFilt === "all" ? `할 일이 없다. 위 넣기 칸으로 넣는다${nr ? `. 한 번 돈 Cycle ${nr}건은 지난 Cycle에 있다` : ""}` : "보일 줄이 없다");
       tfTodoSig = tSig;
@@ -1202,6 +1241,7 @@
     if (d.ok && body.name === "todo memo") $("memoText").value = "";
     if (d.ok && /^todo (up|memo-rm)$/.test(body.name)) memoUp = null;
     if (d.ok && body.name === "todo run") tfDo = null;
+    if (d.ok && body.name === "todo cycle") tfCyc = null;
     tfTodoSig = ""; tfBandSig = "";
     if (document.activeElement && $("tfBand").contains(document.activeElement)) document.activeElement.blur();
     if (d.view) {
@@ -1219,6 +1259,26 @@
     tfRun({ name: "todo add", project: $("tfProject").value, text: $("tfText").value }, "tfTodoSec");
   });
   $("tfOutClose").addEventListener("click", () => { $("tfOutBox").hidden = true; });
+  // 프로젝트 만들기(261103-jipsa-07). 이름 하나만 보내고 결과와 오류는 칸 아래 한 줄로 보인다. 만든 프로젝트를 넣기 줄에 바로 고른다
+  $("tfNew").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const name = $("tfNewName").value.trim(), out = $("tfNewOut"), btn = $("tfNewBtn");
+    if (!name) { $("tfNewName").focus(); return; }
+    btn.disabled = true;
+    let d;
+    try { d = await postJson("/api/project", { name }); } catch (e) { d = { ok: false, text: "만들지 못했다: 서버에 닿지 못했다" }; }
+    btn.disabled = false;
+    out.hidden = false; out.className = `tf-new-out ${d.ok ? "ok" : "fail"}`; out.textContent = d.text || "";
+    if (d.ok) {
+      $("tfNewName").value = "";
+      try { localStorage.setItem("jipsa.tfProject", d.project); } catch { /* 저장이 막혀도 된다 */ }
+    }
+    if (d.view) {
+      if (state.data) { state.data.todofile = d.view; state.data.todo_file_n = d.view.n; }
+      tfTodoSig = ""; drawTodoFile(d.view);
+    }
+    if (d.ok) $("tfProject").value = d.project;
+  });
 
   // 메모 칸. 할 일 파일의 메모 절이다. 넣기, 할 일로, 지우기는 jipsa todo memo, jipsa todo up, jipsa todo memo-rm과 같은 명령이다.
   // 할 일로는 줄 아래에 프로젝트와 기준을 받는 줄을 연다. 메모가 이미 프로젝트 | 할 일 꼴이면 프로젝트를 고르지 않고 올린다
@@ -1516,13 +1576,12 @@ ${v}${ims.length ? `
     try {
       const r = await fetch("/api/answer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runId, answer: text, images: images || [] }) });
       const d = await r.json();
-      // 세션으로 가는 답은 어디로 가는지 같이 보인다. 열린 세션이 없으면 다음 세션이 열릴 때 전달된다고 알려 안 된 것으로 보이지 않게 한다(261031-jipsa-01)
-      note.textContent = d.ok ? (d.resume ? "답을 넣었다. 스케줄러가 다음 주기에 이어 돌린다" : `답을 기록에 적었다. ${d.delivery || "세션이 이어서 처리한다"}`) : `넣지 못했다: ${d.why || ""}`;
+      // 세션으로 가는 답은 어디로 가는지 같이 보인다. 2분 안에 세션이 받지 않으면 스케줄러 작업자로 넘어간다(261103-jipsa-08)
+      note.textContent = d.ok ? (d.resume ? "답을 넣었다. 스케줄러가 다음 주기에 이어 돌린다" : `답을 기록에 적었다. ${d.delivery || ""}`) : `넣지 못했다: ${d.why || ""}`;
       if (!d.ok) return;
       // 답을 넣으면 서버가 확인을 같이 적는다. 상태 전체를 다시 받는 데 10초쯤 걸리므로 돌려받은 확인 기록으로 먼저 상단, 막대, 서랍 머리를 바꾸고
       // 다 받은 뒤 서랍을 한 번 더 그린다. 옛 서버는 확인 기록을 돌려주지 않으므로 다 받은 뒤에야 바뀐다(261022-jipsa-59)
       $("drAnswer").hidden = true; $("drInput").value = ""; clearImages(); fitAnswer();
-      state.delivery = d.delivery ? { run: runId, text: d.delivery } : null; // 답 칸이 닫힌 뒤에도 답 들어감 줄 아래에 어디로 가는지 남긴다
       if (d.confirm && state.data) { state.data.confirm = d.confirm; render(); }
       if (state.open === runId) openResult(runId, true);
       await refreshNow();
@@ -1535,14 +1594,19 @@ ${v}${ims.length ? `
     const box = el("div", "confirm done"); box.id = "drAnswered";
     const urls = new Map((a.images || []).map((x) => [`[Image #${x.n}]`, x])), memo = el("div", "memo");
     const shown = urls.size ? a.answer.split("\n").filter((l) => !/^\[Image #\d+\] \S/.test(l.trim()) || !urls.has(l.trim().split("] ")[0] + "]")).join("\n").trim() : a.answer;
-    memo.append(`답 들어감${a.answered_at ? ` (${mdhm(parse(a.answered_at))})` : ""}: `);
+    memo.append(`넣은 답${a.answered_at ? ` (${mdhm(parse(a.answered_at))})` : ""}: `);
     for (const part of shown.split(/(\[Image #\d+\])/)) { // 표시 글자는 그림을 여는 링크다. 경로는 마우스를 올리면 보인다
       const x = urls.get(part);
       if (!x) { memo.append(part); continue; }
       const link = el("a", "image-tag", part); link.href = x.url; link.target = "_blank"; link.rel = "noopener"; link.title = x.path; memo.appendChild(link);
     }
     box.appendChild(memo);
-    if (state.delivery && state.delivery.run === runId) box.appendChild(el("div", "muted", state.delivery.text)); // 방금 넣은 답이 세션으로 가는 길. 열린 세션이 없으면 다음 세션이 열릴 때 전달된다(261031-jipsa-01)
+    // 그 답이 지금 어디에 있는지. 서버 기록에서 읽어 새로 고쳐도 같다. 아무도 받지 않은 답은 처리된 것처럼 읽히지 않게 강조한다(261103-jipsa-08)
+    if (a.route) {
+      const line = el("div", a.route.done ? "muted" : "route-open", a.route.text);
+      if (a.route.run) { const go = el("a", "", " 결과지 열기"); go.href = "#"; go.addEventListener("click", (e) => { e.preventDefault(); openResult(a.route.run); }); line.appendChild(go); }
+      box.appendChild(line);
+    }
     box.appendChild(el("span", "muted", `잘못 넣었으면 세션에서 jipsa answer ${runId} --undo로 물린다`));
     $("drBody").prepend(box);
   }

@@ -183,6 +183,7 @@ class TaskRun:
         segments: list[dict] = []
         outcome: dict = {}
         limit_waits: list[str] = []
+        draft_sent_back, draft_nudge = False, ""  # 초안 주소가 빈 결과를 돌려보낸 적이 있는지와 다음 구간에 넣을 말
         stage_start = now()
         self.emit("stage_start", attempt=attempt, stage="run")
 
@@ -194,12 +195,14 @@ class TaskRun:
             seg_deadline = min(t0 + timedelta(minutes=p.segment_minutes), total_deadline)
             timeout = max(60, int((seg_deadline - t0).total_seconds()))
             late = self.late_feedback(att_dir)
+            if draft_nudge:
+                late, draft_nudge = f"{late} {draft_nudge}".strip(), ""
             if (seg == 1 and not session) or handover:
                 prompt = prompts.worker_first(
                     project=p, title=self.q["title"], criteria=self.q["criteria"] + (" " + late if late else ""), run_id=self.run_id, attempt=attempt,
                     workspace=ws, run_dir=att_dir, branch=branch, total_deadline=total_deadline,
                     segment_deadline=seg_deadline, dry_run=self.dry_run, prior_analysis=prior_analysis, answer=answer,
-                    handover=handover, codex=provider == codex_window.CODEX, limits=self.q.get("limits"),
+                    handover=handover, codex=provider == codex_window.CODEX, limits=self.q.get("limits"), draft=bool(self.meta.get("draft")),
                 )
                 handover = False
             else:
@@ -262,6 +265,18 @@ class TaskRun:
                     break
             result = _read_json(att_dir / "result.json")
             if result and result.get("status") in VALID_STATUS:
+                # 초안 실행의 마감 검사(261103-jipsa-07). 세션 finish처럼 막되 작업자에게는 사람이 없으므로 한 번 돌려보내고, 그래도 비면 확인 필요로 둔다
+                why = record.draft_problem(self.run_id) if result["status"] == "완료" and not self.dry_run else ""
+                if why and not draft_sent_back and now() < total_deadline:
+                    draft_sent_back, draft_nudge = True, f"result.json을 받지 않았다. {why}. 초안을 만들고 result.json을 다시 쓴다."
+                    (att_dir / "result.json").unlink(missing_ok=True)
+                    seg_info["verdict"] = "초안 주소 없음"
+                    segments.append(seg_info)
+                    self.emit("segment_end", attempt=attempt, stage="run", segment=seg, **{k: v for k, v in seg_info.items() if k != "n"})
+                    seg += 1
+                    continue
+                if why:
+                    result.update(status="확인 필요", rule=f"초안 요청 줄의 마감 검사: {why}")
                 seg_info["verdict"] = "결과 보고"
                 segments.append(seg_info)
                 self.emit("segment_end", attempt=attempt, stage="run", segment=seg, **{k: v for k, v in seg_info.items() if k != "n"})
@@ -499,7 +514,7 @@ class TaskRun:
                 mode=modes.get()["mode"], executor="worker", model=claude.MODEL_WORKER, queue_key=q.get("key"),
                 cycle=q.get("cycle") or "",
                 **{k: q[k] for k in ("category", "pick", "category_guess", "from_run", "review_of", "revise_of", "cycle_step", "cycle_round",
-                                     "todo_key", "todo_line", "limits", "auto_since", "todo_plan", "run_now") if k in q},
+                                     "todo_key", "todo_line", "limits", "auto_since", "todo_plan", "run_now", "draft") if k in q},
             )
             self.emit("run_start", project=p.name, title=q["title"], project_kind=p.kind, limit=total_minutes, dry_run=self.dry_run)
         else:
