@@ -8,6 +8,8 @@
 
 [한국어](README.md) | [English](README.en.md)
 
+<img src="docs/img/structure-ko.gif" width="560" alt="작업 한 건이 도는 구조 애니메이션. 할 일을 적고 Do를 누르면 대기열, 작업자, worktree 커밋, 반대 검토를 거쳐 결과지 한 장과 Slack 한 줄로 돌아오고, 확인 필요면 사람이 고르며, 자동은 커밋까지다">
+
 ![현황판 화면](docs/img/dashboard-board.png)
 
 </div>

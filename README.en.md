@@ -10,6 +10,8 @@
 
 *The dashboard and the screenshots in this document are in Korean. Screen labels below are given in English with the actual Korean label in parentheses.*
 
+<img src="docs/img/structure-en.gif" width="560" alt="Animated structure of one task. Write a to-do and press Do; it goes through the queue, a worker, a worktree commit, and counter-review, and comes back as one result sheet and one Slack line. If it needs attention you pick an option, and automation stops at a commit">
+
 ![Board screen](docs/img/dashboard-board.png)
 
 </div>
