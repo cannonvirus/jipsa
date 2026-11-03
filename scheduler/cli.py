@@ -506,7 +506,7 @@ def cmd_settings(args) -> int:
             _print("거절: 전역 설정은 '칸=값' 꼴만 받는다")
             return 1
         if "JIPSA_SLACK_WEBHOOK" in values:
-            _print("거절: Webhook 주소는 명령줄로 받지 않는다. jipsa settings webhook에 표준 입력으로 준다")
+            _print("거절: Slack 연결 주소는 명령줄로 받지 않는다. jipsa settings webhook에 표준 입력으로 준다")
             return 1
         out = settings.check(values) if args.action == "check" else settings.save(values)
         if not out["ok"]:
@@ -538,7 +538,7 @@ def cmd_settings(args) -> int:
             _print(f"거절: {out['why']}")
             return 1
         events.emit("settings_save", changed=["JIPSA_SLACK_WEBHOOK"])
-        _print(f"Webhook 주소: {out['rows'][0]['before']} -> {out['rows'][0]['after']}. 값은 비밀값 파일에만 있다")
+        _print(f"Slack 연결 주소: {out['rows'][0]['before']} -> {out['rows'][0]['after']}. 값은 비밀값 파일에만 있다")
         return 0
     if args.action == "slack-test":
         out = settings.slack_test()
@@ -787,7 +787,7 @@ def cmd_slack(args) -> int:
     on = slack.is_enabled()
     _print("Slack 알림 " + ("켜짐" if on else "꺼짐. 자동 알림은 보내지 않는다. jipsa report --send는 보낸다"))
     if not slack.is_available():
-        _print("(웹훅이 비어 있어 켜 두어도 보낼 곳이 없다)")
+        _print("(Slack 연결이 없어 켜 두어도 보낼 곳이 없다)")
     return 0
 
 
@@ -1324,7 +1324,7 @@ def cmd_check(args) -> int:
     line("RULES.md", RULES_FILE.exists())
     line("AGENTS.md(RULES.md 사본)", AGENTS_FILE.exists(), "" if AGENTS_FILE.exists() else "Codex 작업자를 쓸 때만 필요하다. jipsa sync-agents로 만든다", optional=True)
     line("policies/claude_settings.json", SETTINGS_FILE.exists())
-    line("Slack Webhook", bool(SLACK_WEBHOOK), "" if SLACK_WEBHOOK else ".env의 JIPSA_SLACK_WEBHOOK이 비어 있다. 보고는 reports/에만 남는다", optional=True)
+    line("Slack 연결", bool(SLACK_WEBHOOK), "" if SLACK_WEBHOOK else "주소(.env의 JIPSA_SLACK_WEBHOOK)가 비어 있다. 보고는 reports/에만 남는다", optional=True)
     try:
         reg = load_all()
         line("등록부", bool(reg), f"{len(reg)}개: {', '.join(reg)}")
@@ -1510,7 +1510,7 @@ def main(argv: list[str] | None = None) -> int:
     a = rs.add_parser("set", help="'키=값'을 저장한다. 설정 파일 직전 판 하나를 남긴다")
     a.add_argument("pairs", nargs="+", help="'키=값'. 값을 비우면 기본값으로 돌아간다")
     rs.add_parser("undo", help="설정 파일을 직전 판과 맞바꾼다")
-    a = rs.add_parser("webhook", help="Slack Webhook 주소를 표준 입력으로 받아 비밀값 파일에 쓴다. 값은 출력하지 않는다")
+    a = rs.add_parser("webhook", help="Slack 연결 주소를 표준 입력으로 받아 비밀값 파일에 쓴다. 값은 출력하지 않는다")
     a.add_argument("--clear", action="store_true", help="비밀값 파일의 주소를 지운다")
     rs.add_parser("slack-test", help="Slack에 시험 글 한 줄을 보낸다")
     a = rs.add_parser("stop", help="스케줄러를 끄고 멈춤을 적어 대시보드 감시가 다시 띄우지 않게 한다. 실행 중 작업이 있으면 --force 없이는 거절한다")

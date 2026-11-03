@@ -1,6 +1,6 @@
 ---
 name: jipsa-slack
-description: Slack 보고 설정. 사용자가 "/jipsa-slack", "/jipsa-slack test", "/jipsa-slack show", "슬랙 주소 넣어 줘", "슬랙 시험 글 보내 줘"라고 하면 Webhook 주소, 시험 글, 아침 요약 시각, 알림 켜짐을 질문으로 받아 jipsa settings 명령으로 쓴다.
+description: Slack 보고 설정. 사용자가 "/jipsa-slack", "/jipsa-slack test", "/jipsa-slack show", "슬랙 주소 넣어 줘", "슬랙 시험 글 보내 줘"라고 하면 Slack 연결 주소, 시험 글, 아침 요약 시각, 알림 켜짐을 질문으로 받아 jipsa settings 명령으로 쓴다.
 ---
 
 # jipsa-slack
@@ -10,7 +10,7 @@ Slack 보고 설정을 질문 4개로 받는다. 인자는 없거나 `test`(`테
 - `show`는 `uv run jipsa settings show --skill slack` 출력만 보이고 묻지 않는다.
 - `test`는 묻지 않고 `uv run jipsa settings slack-test`만 돌려 출력을 보인다.
 
-**Webhook 주소는 비밀값이다.** 세션이 채팅에 다시 적지 않고, 명령 인자로 넘기지 않고, 어디에도 출력하지 않는다. 주소 칸의 값은 설정됨 또는 없음으로만 말한다.
+**Slack 연결 주소는 비밀값이다.** 세션이 채팅에 다시 적지 않고, 명령 인자로 넘기지 않고, 어디에도 출력하지 않는다. 주소 칸의 값은 설정됨 또는 없음으로만 말한다.
 
 ## 같이 지키는 규칙
 
@@ -26,7 +26,7 @@ Slack 보고 설정을 질문 4개로 받는다. 인자는 없거나 `test`(`테
 
 `uv run jipsa settings show --skill slack`으로 지금 값을 읽어 "Slack 보고 설정이다. 지금 주소는 ..., 알림 ..., 아침 요약 ...이다."로 시작한다.
 
-1. Slack Webhook 주소를 붙여 넣는다. 그대로 두려면 엔터다. 받으면 표준 입력으로 넘겨 바로 쓴다. 이 칸은 저장 확인을 기다리지 않는다. 시험 글을 보내려면 먼저 있어야 하기 때문이다.
+1. Slack 연결 주소(Webhook URL)를 붙여 넣는다. 그대로 두려면 엔터다. 받으면 표준 입력으로 넘겨 바로 쓴다. 이 칸은 저장 확인을 기다리지 않는다. 시험 글을 보내려면 먼저 있어야 하기 때문이다.
    - bash는 `printf '%s' '<주소>' | uv run jipsa settings webhook`이다.
    - PowerShell은 `'<주소>' | uv run jipsa settings webhook`이다.
    - 거절되면 거절 문구(주소 꼴)를 보이고 한 번 다시 받는다. 주소를 지우려면 `uv run jipsa settings webhook --clear`다.

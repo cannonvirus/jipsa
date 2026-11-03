@@ -624,7 +624,7 @@ def head_line(metas: list[dict]) -> dict:
     elif not sch["running"]:
         alerts.append({"text": "스케줄러 꺼짐", "title": f"{sw.get('interval') or 30}초 안에 감시가 띄운다" if sw.get("watching") else "uv run jipsa web으로 켠다"})
     if not slack.is_available():  # 환경 변수 다음에 비밀값 파일을 본다. 스킬에서 저장한 직후에도 맞다
-        alerts.append({"text": "웹훅 없음", "title": "Slack 웹훅이 없다. 보고는 파일에만 남는다"})
+        alerts.append({"text": "Slack 연결 안 됨", "title": "Slack이 연결되지 않았다. 보고는 파일에만 남는다"})
     ram_total, ram_free = res.get("ram_total_gb"), res.get("ram_free_gb")
     val = {"claude": {"five": lw.get("five"), "week": lw.get("week"), "five_reset": lw.get("five_reset") or "", "week_reset": lw.get("week_reset") or "",
                       "cleared": bool(lw.get("cleared")), "week_cleared": bool(lw.get("week_cleared")), "fresh": bool(lw.get("fresh")), "seen": lw.get("seen")},

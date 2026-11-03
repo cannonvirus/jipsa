@@ -8,7 +8,7 @@ description: 일반 설정과 되돌리기. 사용자가 "/jipsa-config", "/jips
 다른 스킬에 들지 않는 전역 값 4개를 묻는다. 인자는 없거나 `show`(`보기`) 또는 `undo`(`되돌리기`)다.
 
 - `show`는 `uv run jipsa settings show --skill config` 출력만 보이고 묻지 않는다.
-- `undo`는 설정 파일을 직전 판과 맞바꾼다. `uv run jipsa settings show`로 전 값을 읽고 `uv run jipsa settings undo`를 돌린 뒤 다시 읽어 바뀐 칸을 보인다. 한 번 더 하면 다시 돌아온다. 끝나면 아래 다시 띄우기를 묻는다. /jipsa-model, /jipsa-slack, /jipsa-cleanup이 저장한 값도 같은 설정 파일이라 같이 되돌아간다. Webhook 주소와 알림 켜짐은 다른 파일이라 되돌아가지 않는다.
+- `undo`는 설정 파일을 직전 판과 맞바꾼다. `uv run jipsa settings show`로 전 값을 읽고 `uv run jipsa settings undo`를 돌린 뒤 다시 읽어 바뀐 칸을 보인다. 한 번 더 하면 다시 돌아온다. 끝나면 아래 다시 띄우기를 묻는다. /jipsa-model, /jipsa-slack, /jipsa-cleanup이 저장한 값도 같은 설정 파일이라 같이 되돌아간다. Slack 연결 주소와 알림 켜짐은 다른 파일이라 되돌아가지 않는다.
 
 ## 같이 지키는 규칙
 

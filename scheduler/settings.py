@@ -30,7 +30,7 @@ ITEMS: list[dict] = [
     I(key="JIPSA_AUTO_CAP", group="config", name="자동 작업 동시 수", desc="사람 없이 이어지는 자동 작업(Cycle)을 동시에 몇 개까지 돌릴지다.", kind="int", default="6", unit="개", min=1, max=20),
     I(key="JIPSA_OLLAMA_URL", group="config", name="Ollama 주소", desc="로드한 모델을 묻고 내리는 Ollama 서버 주소다.", kind="url", default="http://127.0.0.1:11434"),
     I(key="JIPSA_SEARCH_SOURCES", group="config", name="로컬 자료 폴더", desc="서칭 단계가 웹보다 먼저 뒤지는 폴더다. 이름=경로;이름=경로 꼴이고 비우면 웹만 본다.", kind="str", default=""),
-    I(key="JIPSA_SLACK_WEBHOOK", group="slack", name="Webhook 주소", desc="Slack으로 보고를 보내는 주소다. 비밀값이라 쓰기만 되고 값은 보이지 않으며 상태 폴더의 비밀값 파일에 저장한다. .env에 있으면 그 값이 앞선다.", kind="secret", default=""),
+    I(key="JIPSA_SLACK_WEBHOOK", group="slack", name="Slack 연결 주소", desc="Slack 연결 주소(Webhook URL)다. Slack으로 보고를 보내는 주소다. 비밀값이라 쓰기만 되고 값은 보이지 않으며 상태 폴더의 비밀값 파일에 저장한다. .env에 있으면 그 값이 앞선다.", kind="secret", default=""),
     I(key="slack.enabled", group="slack", name="알림 켜짐", desc="Slack 보고를 보낼지다. 상태 폴더의 알림 설정 파일에 저장하고 위쪽 메뉴의 스위치와 같은 값이다.", kind="bool", default="1"),
     I(key="JIPSA_MORNING_AT", group="slack", name="아침 요약 알림 시각", desc="밤 사이 끝난 자동 작업을 모아 Slack 글 하나로 보내는 시각이다.", kind="hhmm", default="07:30"),
     I(key="JIPSA_MODEL_WORKER", group="model", name="작업자 모델", desc="Claude 작업자가 쓰는 모델이고 첫 실행 때 정해야 돈다.", kind="str", default="opus", options=["opus", "sonnet", "haiku"]),
@@ -124,7 +124,7 @@ def normalize(key: str, value) -> tuple[str, str]:
         if os.environ.get(key, "").strip():
             return "", f"{it['name']}은(는) 환경 변수(.env)가 덮고 있어 비밀값 파일 값을 쓰지 않는다"
         if text and not _WEBHOOK.match(text):
-            return "", f"{it['name']}은(는) Slack Incoming Webhook 주소여야 한다"
+            return "", f"{it['name']}은(는) Slack 연결 주소(Incoming Webhook)여야 한다"
         return text, ""
     if os.environ.get(key, "").strip():
         return "", f"{it['name']}은(는) 환경 변수가 덮고 있어 설정 파일 값을 쓰지 않는다"
@@ -250,9 +250,9 @@ def slack_test() -> dict:
     from notify import slack
 
     if not slack.is_available():
-        return {"ok": False, "why": "Webhook 주소가 없다. 먼저 저장한다"}
+        return {"ok": False, "why": "Slack 연결 주소가 없다. 먼저 저장한다"}
     try:
-        slack.send_message(f"[jipsa] 시험 글 {now_iso()[11:16]}. 이 줄이 보이면 Webhook 주소가 맞다", force=True)
+        slack.send_message(f"[jipsa] 시험 글 {now_iso()[11:16]}. 이 줄이 보이면 Slack 연결이 맞다", force=True)
     except Exception as e:  # noqa: BLE001 - 실패 사유를 보인다
         return {"ok": False, "why": redact(str(e))[:200]}
     return {"ok": True, "text": "시험 글 한 줄을 보냈다. 응답 코드 200이다"}
