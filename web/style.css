@@ -847,3 +847,13 @@ button.sb { cursor: pointer; } button.sb:hover span { color: var(--acc); }
 @media (max-width: 900px) { .tf-band { grid-template-columns: minmax(0, 1fr); } .tf-res { border-right: 0; border-bottom: 1px solid var(--grid); } .tf-band .lane { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) { .tf-line { gap: 4px 14px; } .tf-line .lnk { margin-left: 0; } .tf-line .it { max-width: 100%; } }
 .confirm .route-open { color: var(--cue-edge); font-weight: 600; } /* 넣은 답을 아직 아무도 받지 않았다는 줄(261103-jipsa-08) */
+
+/* 영어 상태 이름은 한국어보다 길어 상태 칸을 넓힌다(Needs attention, Awaiting answer). 한국어 화면의 칸 폭은 그대로다 */
+html[lang="en"] .pl .q .st { width: 128px; }
+html[lang="en"] .tf-row .meta .criteria::before { content: "Criteria "; } /* CSS가 붙이는 칸 이름도 영어 화면에서 바꾼다 */
+html[lang="en"] .cq li { grid-template-columns: 136px 130px minmax(0, 1fr) 80px auto; }
+/* 화면 언어 단추(261103-misc-14). 화면 모드 단추와 같은 줄, 같은 크기다 */
+.lang-flip { min-width: 46px; background: transparent; color: var(--acc); }
+.lang-flip:hover { color: var(--ink); }
+/* 영어 화면에서 결과지 본문이 한국어라는 안내 한 줄 */
+.drawer-body .lang-note { margin: 12px 28px 0; padding: 6px 10px; font-size: 12px; color: var(--muted); border-left: 3px solid var(--grid); }

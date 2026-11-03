@@ -6,7 +6,8 @@
   const STAGE_NAME = { run: "진행", analyze: "Sol 공격", search: "서칭", reply: "공격 답과 보고서 수정" };
   // 상태 값 확인 필요는 사람 답이 필요한 실행이다(261022-jipsa-50 전 이름은 판단 대기, 서버가 읽을 때 새 이름으로 맞춘다).
   // 화면의 확인 필요는 이 상태 값과 확인하지 않은 완료와 실패를 함께 부르는 이름이다(옛 이름 확인 전 완료도 여기에 합쳤다, 261023-jipsa-26). 답이 필요한 것은 물음표 표시와 툴팁으로 가른다
-  const stName = (s) => s;
+  const T = window.T; // 화면 글자 사전(web/i18n.js). 한국어 원문이 키다
+  const stName = (s) => (s ? T(s) : s); // 상태 값은 저장과 비교에서 그대로 두고 화면에 보일 때만 이 변환을 지난다(261103-misc-14)
   const FINAL_STEP = "종합 보고"; // 끝난 cycle의 종합 보고 단계(261023-jipsa-33)
   const EXECUTOR = { worker: "스케줄러 작업자", subagent: "세션 서브에이전트", session: "Main 세션", manual: "손으로 들여옴" };
   const GROUP = { worker: "스케줄러 (jipsa run)", subagent: "세션 (Claude Code)", session: "세션 (Claude Code)", manual: "손으로 들여온 기록" };
@@ -23,12 +24,13 @@
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const svgEl = (tag, attrs) => { const e = document.createElementNS(SVG, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
   // 걸린 분만 보이다가 상한의 80% 이상이면 상한을 같이, 넘기면 넘김을 보인다(261029-jipsa-22 1안). scheduler/config.py의 time_text와 같다
-  const dur = (used, limit) => { const u = used ?? 0; return !limit || u < limit * 0.8 ? `${u}분` : u > limit ? `${u}분, 상한 ${limit}분 넘김` : `${u}분/${limit}분`; };
-  const budgetText = (run) => { const b = run && run.match_budget; return b ? `${b.text}, 새 판 마감 ${String(b.stop_new_at || "").slice(11, 16)}` : ""; }; // 판 수로 계산한 상한의 근거
+  const dur = (used, limit) => { const u = used ?? 0; return !limit || u < limit * 0.8 ? T("{n}분", { n: u }) : u > limit ? T("{n}분, 상한 {limit}분 넘김", { n: u, limit }) : T("{n}분/{limit}분", { n: u, limit }); };
+  const budgetText = (run) => { const b = run && run.match_budget; return b ? T("{text}, 새 판 마감 {at}", { text: b.text, at: String(b.stop_new_at || "").slice(11, 16) }) : ""; }; // 판 수로 계산한 상한의 근거
   const pill = (status) => el("span", `stpill ${(status || "").replace(" ", "")}`, stName(status) || ""); // 모양은 상태 표기 한 벌의 CSS가 그린다(8안)
-  const pname = (p) => (p === "misc" ? "기타" : p); // 등록부 misc는 등록부 프로젝트에 속하지 않는 일(PC 점검, 조사, 선정)이고 화면에서는 기타다
+  const pname = (p) => (p === "misc" ? T("기타") : p);
+  const pkey = (p) => (p === "misc" ? "기타" : p); // 줄 묶기와 비교에 쓰는 이름. 화면 글자는 pname이다 // 등록부 misc는 등록부 프로젝트에 속하지 않는 일(PC 점검, 조사, 선정)이고 화면에서는 기타다
   // 세션 기록은 질문과 작업을 넣는 Main 세션이다. 시작 폴더의 프로젝트나 지난 주제 이름 대신 Main 세션과 시작 시각으로 부른다
-  const runName = (r) => ((r.run_id || "").startsWith("session-") ? `Main 세션 ${mdhm(parse(r.started))}`.trim() : `${pname(r.project)} / ${r.title}`);
+  const runName = (r) => ((r.run_id || "").startsWith("session-") ? T("Main 세션 {t}", { t: mdhm(parse(r.started)) }).trim() : `${pname(r.project)} / ${r.title}`);
   const runNo = (id) => ((id || "").match(/-([^-]+)$/) || [])[1] || id || ""; // 실행ID의 마지막 토막. 261025-jipsa-31이면 31이다
   const recLabel = (o, i) => (i === 0 && !o.includes("추천") ? `(추천) ${o}` : o); // 문구에 이미 추천 표시가 있으면 더 붙이지 않는다
 
@@ -80,7 +82,7 @@
   // 상태 값 확인 필요 막대 가운데 아직 사람 몫인 것(주황)과 답 없이 확인한 것(확인함, 완료처럼 초록)을 가른다. 지난 기록은 확인 기록이 없어 모두 주황이다
   const isHold = (m) => m.status === "확인 필요" && !m.piece && shownOf(m.run.run_id, m.status, finOf(m)) === "확인 필요";
   const isAckedHold = (m) => m.status === "확인 필요" && !m.piece && shownOf(m.run.run_id, m.status, finOf(m)) === "확인함";
-  const holdText = (m) => (isAnswered(m) ? "답 들어감, 처리 대기" : isAckedHold(m) ? "확인함(답 없이 확인, 상태 값과 큐 보류는 그대로)" : m.status === "확인 필요" ? "확인 필요, 답을 넣을 것" : ackOf(m) === "cue" ? (m.status === "실패" ? "확인 필요(실패)" : "확인 필요") : m.status);
+  const holdText = (m) => (isAnswered(m) ? T("답 들어감, 처리 대기") : isAckedHold(m) ? T("확인함(답 없이 확인, 상태 값과 큐 보류는 그대로)") : m.status === "확인 필요" ? T("확인 필요, 답을 넣을 것") : ackOf(m) === "cue" ? (m.status === "실패" ? T("확인 필요(실패)") : T("확인 필요")) : stName(m.status));
   // 확인 필요 큐(261023-jipsa-37 3안). 머리 숫자, 확인 필요 탭 배지, 현황판 카드, 확인 필요 탭 목록이 모두 이 목록을 센다.
   // 서버가 24시간 창과 무관하게 모든 실행 기록에서 같은 규칙(ackState)으로 고른다. 확인이나 답을 넣은 뒤 다음 응답 전까지는 이 창의 확인 기록으로 먼저 뺀다
   const liveCue = () => {
@@ -172,8 +174,8 @@
   }
   // 첫 주제는 세션 시작부터 잡는다(주제를 걸기 전의 몇 분도 그 일이다). 주제의 프로젝트가 없으면 시작 폴더의 프로젝트, 그것도 없으면 기타다
   function sessionPieces(m) {
-    const home = pname(m.run.cwd_project || "기타");
-    const ts = (m.run.topics || []).map((t) => ({ start: parse(t.ts), ended: t.ended ? parse(t.ended) : null, title: t.title, project: pname(t.project || home), run_id: t.run_id || "" })).filter((t) => t.start < m.end && t.start >= m.started);
+    const home = pkey(m.run.cwd_project || "기타");
+    const ts = (m.run.topics || []).map((t) => ({ start: parse(t.ts), ended: t.ended ? parse(t.ended) : null, title: t.title, project: pkey(t.project || home), run_id: t.run_id || "" })).filter((t) => t.start < m.end && t.start >= m.started);
     if (!ts.length) return [];
     ts[0].start = m.started;
     // jipsa topic --done으로 닫힌 주제는 그 시각에 끝나고 완료다. 닫힌 뒤 다음 주제 전까지는 세션이 일하지 않으므로 어느 줄에도 그리지 않는다
@@ -188,7 +190,7 @@
     return { ...m, piece: true, started: pc.start, end: pc.end, status: live ? "진행 중" : "완료", waits: [], retries: [], stages: [],
              run: { ...m.run, title: pc.title, minutes_limit: 0, minutes_used: mins(pc.start, pc.end) } };
   }
-  const TL_EMPTY = $("tlEmpty").textContent, FILTER_KEY = "jipsa.tl.filter";
+  const TL_EMPTY = $("tlEmpty").__tKey || $("tlEmpty").textContent, FILTER_KEY = "jipsa.tl.filter";
   const tlSel = () => [...document.querySelectorAll("#tlFilter input:checked")].map((i) => i.value);
   // 확인 필요 칩은 배지가 세는 기준(isCue)에 상태 값 확인 필요 막대 전부를 더한 것이다. 답을 넣고 처리를 기다리는 막대도 남긴다
   // 확인하지 않은 완료도 확인 필요 칩에 든다. 따로 있던 확인 전 완료 칩은 없앴다(261023-jipsa-26)
@@ -230,16 +232,16 @@
       if (m.run.cycle) {
         const ck = m.run.cycle, c = cycInfo.get(ck);
         const gp = (c && c.project) || ck.split("::")[0] || m.run.project, pk = `project:${gp}`;
-        if (!goals.has(ck)) goals.set(ck, { key: `goal:${ck}`, name: `목표 ${c ? c.title : ck.split("::").pop()}`, runs: [], split: new Set(), goal: c || null, rounds: new Map(), final: null, sub: true, goalHead: true, pk });
+        if (!goals.has(ck)) goals.set(ck, { key: `goal:${ck}`, name: T("목표 {t}", { t: c ? c.title : ck.split("::").pop() }), runs: [], split: new Set(), goal: c || null, rounds: new Map(), final: null, sub: true, goalHead: true, pk });
         const g = goals.get(ck); g.runs.push(m); g.split.add(m);
         if (!lanes.has(pk)) lanes.set(pk, { key: pk, name: gp, runs: [], split: new Set() });
         lanes.get(pk).runs.push(m); lanes.get(pk).split.add(m); // 프로젝트 머리 줄은 상태만 모으고 막대는 목표 묶음 줄에 그린다
         if (m.run.cycle_step === FINAL_STEP || (c && c.final && c.final.run_id === m.run.run_id)) {
-          if (!g.final) g.final = { key: `${g.key}:final`, name: "종합 보고", runs: [], sub: true, deep: true, final: true };
+          if (!g.final) g.final = { key: `${g.key}:final`, name: T("종합 보고"), runs: [], sub: true, deep: true, final: true };
           g.final.runs.push(m); continue;
         }
         const n = m.run.cycle_round ?? roundOf.get(m.run.run_id) ?? +((m.run.title.match(/Cycle (\d+)|(\d+)바퀴/) || []).slice(1).find(Boolean) || 0);
-        if (!g.rounds.has(n)) g.rounds.set(n, { key: `${g.key}:r${n}`, name: n ? `Cycle ${n}` : "Cycle 미상", runs: [], sub: true, deep: true, n });
+        if (!g.rounds.has(n)) g.rounds.set(n, { key: `${g.key}:r${n}`, name: n ? `Cycle ${n}` : T("Cycle 미상"), runs: [], sub: true, deep: true, n });
         g.rounds.get(n).runs.push(m); continue;
       }
       if (m.run.project === "misc") { // 같은 이름의 기타 주제와 한 줄을 쓴다
@@ -259,7 +261,7 @@
       const ik = sa ? `run:${m.run.run_id}` : `item:${m.run.title}`, subs = subsOf.get(k);
       if (!subs.has(ik)) subs.set(ik, { key: `${k}:${ik}`, name: sa ? `${runNo(m.run.run_id)} ${m.run.title}` : m.run.title, runs: [], sub: true,
                                         tip: sa ? `${m.run.run_id} ${m.run.title}${m.run.agent ? `
-서브에이전트 ${m.run.agent}` : ""}` : "" });
+${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
       subs.get(ik).runs.push(m); laneOf.set(m.run.run_id, subs.get(ik));
     }
     for (const m of sorted.filter(isSession)) {
@@ -297,9 +299,9 @@
         if (g.final) { g.final.runs = g.final.runs.filter(keep); if (!g.final.runs.length) g.final = null; }
         g.runs = g.runs.filter(keep); if (!g.runs.length) goals.delete(k);
       }
-      if (!lanes.size && !etc.size && !goals.size) { $("tlEmpty").textContent = "필터에 맞는 항목이 없다."; $("tlEmpty").hidden = false; return models; }
+      if (!lanes.size && !etc.size && !goals.size) { $("tlEmpty").textContent = T("필터에 맞는 항목이 없다."); $("tlEmpty").hidden = false; return models; }
     }
-    $("tlEmpty").textContent = TL_EMPTY;
+    $("tlEmpty").textContent = T(TL_EMPTY);
     // 끝난 일 접기(261023-jipsa-38 4안). 끝나고 확인한 완료만 있는 항목 줄은 프로젝트 머리 줄에 막대로 모으고 오른쪽 칸에 "완료 N"을 적는다.
     // 진행 중, 확인 필요, 실패가 든 줄은 펼친 채다. 머리 줄의 화살표나 "완료 N"을 누르면 그 프로젝트만 펼친다. 상태 필터를 걸면 접지 않는다
     const settled = (m) => (m.status === "완료" || isAckedHold(m)) && !isCue(m); // 답 없이 확인한 확인 필요도 끝나고 확인한 것이다
@@ -332,7 +334,7 @@
     if (etc.size) {
       const open = etcOpen();
       const subs = [...etc.values()].sort((a, b) => a.runs[0].started - b.runs[0].started);
-      rows.push({ key: "etc", name: `기타 (${subs.length})`, header: true, runs: subs.flatMap((l) => l.runs).sort((a, b) => a.started - b.started) });
+      rows.push({ key: "etc", name: `${T("기타")} (${subs.length})`, header: true, runs: subs.flatMap((l) => l.runs).sort((a, b) => a.started - b.started) });
       if (open) rows.push(...subs);
     }
     // 자식 실행(jipsa begin으로 띄운 서브에이전트)이 있는 Agent 표식은 그리지 않는다
@@ -355,7 +357,7 @@
     const svg = svgEl("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img" });
     if (narrow) { svg.style.width = `${width}px`; svg.style.maxWidth = "none"; }
     else { svg.style.width = "100%"; svg.style.maxWidth = "100%"; svg.style.height = "auto"; } // 넓은 창에서 세로 막대가 늦게 생겨 폭이 줄어도 가로 스크롤 없이 비율로 줄인다
-    svg.appendChild(svgEl("title", {})).textContent = "프로젝트별 타임라인";
+    svg.appendChild(svgEl("title", {})).textContent = T("프로젝트별 타임라인");
     // 막대는 그림 영역(이름 칸 오른쪽)에서만 보인다. 가로로 스크롤하면 이름 칸이 왼쪽에 붙어 따라오고 막대는 그 아래로 들어간다
     const clip = svgEl("clipPath", { id: "tlPlotClip" }), clipRect = svgEl("rect", { x: LABEL_W, y: 0, width: plotW + RIGHT, height });
     clip.appendChild(clipRect); svg.appendChild(clip);
@@ -375,8 +377,8 @@
     svg.appendChild(grid); svg.appendChild(axis);
     if (cutX !== null) {
       const dl = svgEl("line", { class: "dawn", x1: cutX, x2: cutX, y1: TOP - 6, y2: height - 6 }); svg.appendChild(dl);
-      const t = svgEl("text", { class: "dawn-label", x: cutX, y: 12, "text-anchor": "middle" }); t.textContent = `종료 ${hhmm(cutoff)}`; svg.appendChild(t);
-      for (const n of [dl, t]) tip(n, () => [["Auto 마감", hhmm(cutoff)], ["Auto 모드가 새 Cycle을 멈추는 시각", ""]]);
+      const t = svgEl("text", { class: "dawn-label", x: cutX, y: 12, "text-anchor": "middle" }); t.textContent = T("종료 {t}", { t: hhmm(cutoff) }); svg.appendChild(t);
+      for (const n of [dl, t]) tip(n, () => [[T("Auto 마감"), hhmm(cutoff)], [T("Auto 모드가 새 Cycle을 멈추는 시각"), ""]]);
     }
     if (vnow.getTime() >= tmin && vnow.getTime() <= tmax) {
       svg.appendChild(svgEl("line", { class: "nowline", x1: x(vnow.getTime()), x2: x(vnow.getTime()), y1: TOP - 6, y2: height - 6 }));
@@ -394,7 +396,7 @@
       stuck.push(lg);
       const goalHead = !!lane.goalHead;
       const lab = svgEl("text", { class: `row-label${lane.sub ? " sub" : ""}${lane.header ? " etc-head" : ""}${goalHead ? " goal-head" : ""}${lane.final ? " final" : ""}`, x: lane.deep ? 48 : lane.sub ? 34 : 20, y: y + 4, tabindex: 0, role: "button" });
-      lab.textContent = lane.name; lab.dataset.full = lane.name; lg.appendChild(lab); // 자르는 일은 그린 뒤 실제 글 폭으로 한다
+      lab.textContent = lane.name === "기타" ? T("기타") : lane.name; lab.dataset.full = lane.name; lg.appendChild(lab); // 자르는 일은 그린 뒤 실제 글 폭으로 한다
       lg.appendChild(svgEl("title", {})).textContent = lane.tip || lane.name; // 이름 칸은 줄임표로 줄어드므로 전체 이름은 툴팁이다
       if (lane.header) { // 기타는 최상위 줄이다. 접고 펴는 화살표는 이름 왼쪽 여백에 두어 프로젝트 이름과 글자 위치를 맞춘다
         lab.setAttribute("aria-expanded", String(etcOpen()));
@@ -403,7 +405,7 @@
       }
       if (lane.fold) { // 끝난 일 접기 화살표. 기타 묶음과 같은 자리다
         const arrow = svgEl("text", { class: "etc-arrow fold-arrow", x: 6, y: y + 4, role: "button", tabindex: 0, "aria-expanded": String(lane.fold.open) });
-        arrow.textContent = lane.fold.open ? "▾" : "▸"; arrow.appendChild(svgEl("title", {})).textContent = lane.fold.open ? "끝난 일 접기" : "끝난 일 펼치기";
+        arrow.textContent = lane.fold.open ? "▾" : "▸"; arrow.appendChild(svgEl("title", {})).textContent = lane.fold.open ? T("끝난 일 접기") : T("끝난 일 펼치기");
         arrow.addEventListener("click", () => toggleFold(lane.key));
         arrow.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggleFold(lane.key); } });
         lg.appendChild(arrow);
@@ -419,16 +421,16 @@
         const mg = svgEl("g", { "clip-path": "url(#tlPlotClip)", class: `run st-${isAckedHold(m) ? "완료" : m.status}${isHold(m) ? " hold" : ""}${isAnswered(m) ? " answered" : ""}${m.status !== "확인 필요" && isCue(m) ? " cue-unread" : ""}` }); // 상태 값 확인 필요와 확인하지 않은 완료 모두 같은 주황 막대, 답 없이 확인한 확인 필요는 완료처럼 초록
         for (const w of m.waits) {
           const wr = svgEl("rect", { class: "wait", x: x(w.start.getTime()), y: y - BAR_H / 2, width: Math.max(2, x(w.end.getTime()) - x(w.start.getTime())), height: BAR_H, rx: 3 });
-          tip(wr, () => [[w.kind === "limit_wait" ? "한도 대기" : "자원 대기", `${hhmm(w.start)} ~ ${hhmm(w.end)}`], ...(w.why ? [["사유", w.why]] : [])]); mg.appendChild(wr);
+          tip(wr, () => [[w.kind === "limit_wait" ? T("한도 대기") : T("자원 대기"), `${hhmm(w.start)} ~ ${hhmm(w.end)}`], ...(w.why ? [[T("사유"), w.why]] : [])]); mg.appendChild(wr);
         }
         const x0 = x(m.started.getTime()), x1 = Math.max(x0 + (isHold(m) ? 12 : 4), x(m.end.getTime()));
         const cutL = m.started.getTime() < tmin, cutR = m.end.getTime() > tmax; // 범위 밖에서 시작했거나 범위 뒤로 이어지는 막대: 끝을 잘라 그리고 작은 삼각형을 남긴다
-        const rowsTip = () => [[m.run.title, ""], [`${m.end < winStart ? `${mdhm(m.started)}` : hhmm(m.started)} ~ ${m.status === "진행 중" ? "진행 중" : hhmm(m.end)}`, dur(usedMin(m), m.run.minutes_limit)], ["상태", holdText(m)], ...(stallText(m) ? [["멈춤", `${m.run.stall_min}분 무활동. 띄운 세션에 깨우라고 알렸다`]] : []), ...(budgetText(m.run) ? [["판 수 상한", budgetText(m.run)]] : []), ...(m.run.label ? [["결과", m.run.label]] : []), ...(atkText(m.run) ? [["Sol 공격", atkText(m.run)]] : []), ...(m.run.executor ? [["주체", EXECUTOR[m.run.executor] || m.run.executor]] : []), ...(m.run.agent ? [["서브에이전트", m.run.agent]] : [])];
+        const rowsTip = () => [[m.run.title, ""], [`${m.end < winStart ? `${mdhm(m.started)}` : hhmm(m.started)} ~ ${m.status === "진행 중" ? T("진행 중") : hhmm(m.end)}`, dur(usedMin(m), m.run.minutes_limit)], [T("상태"), holdText(m)], ...(stallText(m) ? [[T("멈춤"), T("{n}분 무활동. 띄운 세션에 깨우라고 알렸다", { n: m.run.stall_min })]] : []), ...(budgetText(m.run) ? [[T("판 수 상한"), budgetText(m.run)]] : []), ...(m.run.label ? [[T("결과"), m.run.label]] : []), ...(atkText(m.run) ? [[T("Sol 공격"), atkText(m.run)]] : []), ...(m.run.executor ? [[T("주체"), T(EXECUTOR[m.run.executor] || m.run.executor)]] : []), ...(m.run.agent ? [[T("서브에이전트"), m.run.agent]] : [])];
         if (m.status === "진행 중" && m.stages.length && m.run.executor !== "session") {
           for (const st of m.stages) { // 진행 중인 작업자는 단계 색으로
             const sx0 = x(st.start.getTime()), sx1 = Math.max(sx0 + 3, x(st.end.getTime()));
             const r = svgEl("rect", { class: `bar ${st.stage}${st.open ? " pulse" : ""}`, x: sx0, y: y - BAR_H / 2, width: sx1 - sx0, height: BAR_H, rx: 3, tabindex: 0 });
-            tip(r, () => [[`${STAGE_NAME[st.stage] || st.stage} (시도 ${st.attempt})`, ""], ...rowsTip()]);
+            tip(r, () => [[T("{s} (시도 {n})", { s: T(STAGE_NAME[st.stage] || st.stage), n: st.attempt }), ""], ...rowsTip()]);
             r.addEventListener("click", () => openResult(m.run.run_id)); mg.appendChild(r);
           }
         } else {
@@ -454,14 +456,14 @@
           const open = !m.ended.has(t.id) && m.status === "진행 중";
           const ax0 = x(t.ts.getTime()), ax1 = Math.max(ax0 + 3, x(endTs.getTime()));
           const a = svgEl("rect", { class: `agent-mark${open ? " pulse" : ""}`, x: ax0, y: y + BAR_H / 2 + 2, width: ax1 - ax0, height: 4, rx: 2 });
-          tip(a, () => [[t.summary, ""], [`${hhmm(t.ts)} ~ ${open ? "진행 중" : hhmm(endTs)}`, `${mins(t.ts, endTs)}분`], ["하위 도구", `${kidsN(t)}개`]]);
+          tip(a, () => [[t.summary, ""], [`${hhmm(t.ts)} ~ ${open ? T("진행 중") : hhmm(endTs)}`, T("{n}분", { n: mins(t.ts, endTs) })], [T("하위 도구"), T("{n}개", { n: kidsN(t) })]]);
           a.addEventListener("click", () => openResult(m.run.run_id)); mg.appendChild(a);
         }
         for (const rt of m.retries) {
           const rg = svgEl("g", { class: "retry" });
           rg.appendChild(svgEl("circle", { cx: x(rt.ts.getTime()), cy: y, r: 7 }));
           const t = svgEl("text", { x: x(rt.ts.getTime()), y: y + 3.5 }); t.textContent = "R"; rg.appendChild(t);
-          tip(rg, () => [["재시도", `시도 ${rt.next}`], ["원인", rt.cause || ""]]); mg.appendChild(rg);
+          tip(rg, () => [[T("재시도"), T("시도 {n}", { n: rt.next })], [T("원인"), rt.cause || ""]]); mg.appendChild(rg);
         }
         g.appendChild(mg);
       }
@@ -476,11 +478,11 @@
       if (!goalHead && live.some((m) => !drawn.includes(m))) {
         const stalled = live.filter((m) => stallText(m)).length;
         shape = stalled ? "stop" : "run";
-        rest.textContent = `진행 중 ${live.length}건${stalled ? `  멈춤 ${stalled}건` : ""}`;
+        rest.textContent = T("진행 중 {n}건", { n: live.length }) + (stalled ? T("  멈춤 {n}건", { n: stalled }) : "");
         tip(st, () => live.map((m) => [m.run.title, `${dur(usedMin(m), m.run.minutes_limit)}${stallText(m)}`]));
       }
       if (lane.fold && !goalHead) { // 끝난 일을 모은 머리 줄은 "완료 N"이다. 누르면 펼치거나 접는다
-        shape = "done"; rest.textContent = `완료 ${lane.fold.n}  ${lane.fold.open ? "접기" : "펼치기"}`;
+        shape = "done"; rest.textContent = `${T("완료")} ${lane.fold.n}  ${lane.fold.open ? T("접기") : T("펼치기")}`;
         st.classList.add("fold-sum"); st.setAttribute("role", "button"); st.setAttribute("tabindex", 0);
         st.addEventListener("click", () => toggleFold(lane.key));
         st.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggleFold(lane.key); } });
@@ -490,7 +492,7 @@
         // 오른쪽 칸이 좁아 줄여 쓴다. 끝난 목표는 ■ 뒤에 종합 보고 상태만, 도는 목표는 단계 이름을 줄인다. 전체 글은 툴팁과 위 목표 줄에 있다
         const w = lane.goal.where || `Cycle ${lane.goal.rounds.length}`;
         rest.textContent = lane.goal.status === "끝" ? w.split(", ").pop() : w.replace("명령 이행", "이행").replace("분석과 피드백", "분석");
-        tip(st, () => [[lane.goal.title, ""], ["위치", lane.goal.where || ""], ["상태", lane.goal.state_text], ["Cycle 수", `${lane.goal.rounds.length}`], ["주체", lane.goal.owner_text]]);
+        tip(st, () => [[lane.goal.title, ""], [T("위치"), lane.goal.where || ""], [T("상태"), lane.goal.state_text], [T("Cycle 수"), `${lane.goal.rounds.length}`], [T("주체"), lane.goal.owner_text]]);
       }
       const sh = stShape(shape, width - RIGHT + 14, y); if (shape === "run") sh.classList.add("pulse");
       g.appendChild(sh); st.appendChild(rest); g.appendChild(st);
@@ -520,12 +522,12 @@
     for (const c of counts) {
       const bb = c.lab.getBBox(), cy = bb.y + bb.height / 2;
       let x0 = bb.x + bb.width + 6;
-      for (const [n, cls, label, tail] of [[c.n, "cue-count", "확인 필요", c.hold ? `. 답을 넣을 것 ${c.hold}건 포함` : ""]]) {
+      for (const [n, cls, label, tail] of [[c.n, "cue-count", T("확인 필요"), c.hold ? T(". 답을 넣을 것 {n}건 포함", { n: c.hold }) : ""]]) {
         if (!n) continue;
         const w = 18 + (String(n).length - 1) * 7, cg = svgEl("g", { class: cls });
         cg.appendChild(svgEl("rect", { x: x0, y: cy - 8, width: w, height: 16, rx: 8 }));
         const t = svgEl("text", { x: x0 + w / 2, y: cy + 4, "text-anchor": "middle" }); t.textContent = `${n}`; cg.appendChild(t);
-        cg.appendChild(svgEl("title", {})).textContent = `${label} ${n}건${tail}`;
+        cg.appendChild(svgEl("title", {})).textContent = T("{label} {n}건{tail}", { label, n, tail });
         c.g.appendChild(cg); x0 += w + 4;
       }
     }
@@ -569,7 +571,7 @@
   }
 
   // 세션 서브에이전트가 활동 없이 멈춘 분. 스케줄러가 15분부터 적고 띄운 세션에 알린다
-  function stallText(m) { return m.status === "진행 중" && m.run.stall_min > 0 ? `  멈춤 ${m.run.stall_min}분` : ""; }
+  function stallText(m) { return m.status === "진행 중" && m.run.stall_min > 0 ? T("  멈춤 {n}분", { n: m.run.stall_min }) : ""; }
   function flatTools(m) {
     const out = [];
     for (const seg of m.segments) for (const t of seg.tools) out.push(t);
@@ -585,7 +587,7 @@
       const j = await r.json();
       if (state.data) state.data.slack_on = j.slack_on;
       $("slackSw").className = "slacksw " + (j.slack_on ? "on" : "off"); $("slackSw").setAttribute("aria-pressed", String(j.slack_on));
-      $("slackTxt").textContent = j.slack_on ? "Slack 켜짐" : "Slack 꺼짐";
+      $("slackTxt").textContent = j.slack_on ? T("Slack 켜짐") : T("Slack 꺼짐");
     } catch (e) { /* 다음 갱신에서 서버 값으로 맞춘다 */ }
   });
   // 상태창(261023-jipsa-38, 37 결과지 답): 탭보다 앞에 늘 보이는 지금 현황. 확인 필요, 진행 중(무엇을 하는지), 멈춤, 실패만 둔다. 사용 창은 머리 줄 한 줄 현황이다(261023-jipsa-41).
@@ -596,17 +598,17 @@
       s.appendChild(el("i", "sh-i")); s.appendChild(el("b", null, String(n))); s.appendChild(el("span", null, label)); box.appendChild(s); return s;
     };
     const live = data.live || [], stalled = live.filter((r) => r.stall_min > 0), fails = cue.filter((x) => x.kind === "실패").length;
-    item("cue", cue.length, "확인 필요", goCue);
-    const run = item("run", live.length, "진행 중", () => setTab("timeline"));
-    run.title = live.map((r) => `${pname(r.project)} ${r.title}, ${ago(r.started)} 시작`).join("\n");
+    item("cue", cue.length, T("확인 필요"), goCue);
+    const run = item("run", live.length, T("진행 중"), () => setTab("timeline"));
+    run.title = live.map((r) => T("{p} {t}, {ago} 시작", { p: pname(r.project), t: r.title, ago: ago(r.started) })).join("\n");
     if (live.length) { // 무엇을 하는지 한 줄. 누르면 결과지가 열린다
       const r = live.find((x) => !x.stall_min) || live[0];
       const w = el("button", "sb-now", `${pname(r.project)} ${r.title}`); w.type = "button"; w.title = run.title;
       w.addEventListener("click", () => openResult(r.run_id)); box.appendChild(w);
-      if (live.length > 1) box.appendChild(el("span", "sb-more muted", `외 ${live.length - 1}`));
+      if (live.length > 1) box.appendChild(el("span", "sb-more muted", T("외 {n}", { n: live.length - 1 })));
     }
-    if (stalled.length) { const s = item("stop", stalled.length, "멈춤", () => openResult(stalled[0].run_id)); s.title = stalled.map((r) => `${pname(r.project)} ${r.title}, ${r.stall_min}분 무활동`).join("\n"); }
-    if (fails) item("fail", fails, "실패", goCue);
+    if (stalled.length) { const s = item("stop", stalled.length, T("멈춤"), () => openResult(stalled[0].run_id)); s.title = stalled.map((r) => T("{p} {t}, {n}분 무활동", { p: pname(r.project), t: r.title, n: r.stall_min })).join("\n"); }
+    if (fails) item("fail", fails, T("실패"), goCue);
   }
   // 확인 필요 탭은 없앴다(261029-jipsa-43 1안). 확인 필요 숫자를 누르면 현황판의 확인 필요 띠로 간다
   const goCue = () => { setTab("board"); setTimeout(() => { const w = $("attnWrap"); if (w && !w.hidden) w.scrollIntoView({ block: "start" }); }, 50); };
@@ -620,7 +622,7 @@
     const span = (iso, sign) => { // 기준 시각에서 앞뒤로 얼마인지
       const t = parse(iso); if (!t || isNaN(t)) return "";
       const m = Math.max(0, Math.round(sign * (t - vnow) / 60000)), d = Math.floor(m / 1440), hr = Math.floor((m % 1440) / 60);
-      return d ? `${d}일 ${hr}시간` : hr ? `${hr}시간 ${m % 60}분` : `${m % 60}분`;
+      return d ? T("{d}일 {h}시간", { d, h: hr }) : hr ? T("{h}시간 {n}분", { h: hr, n: m % 60 }) : T("{n}분", { n: m % 60 });
     };
     let n = 0;
     const group = (cls, label, title) => {
@@ -633,18 +635,18 @@
       const cut = (v, c, reset) => (v == null ? null : c || (reset && parse(reset) <= vnow) ? 0 : Math.round(v)); // 초기화 시각이 지난 창은 0%
       const five = cut(u.five, u.cleared, u.five_reset), week = cut(u.week, u.week_cleared, u.week_reset);
       const stale = !u.fresh && (five != null || week != null);
-      const line = (k, v, reset) => `${k} ${v == null ? "측정 없음" : `${v}%`}${v != null && reset && parse(reset) > vnow ? `, ${span(reset, 1)} 뒤 초기화` : v === 0 && reset ? ", 초기화됨" : ""}`;
-      const g = group(name.toLowerCase(), name, [line("5시간", five, u.five_reset), line("주간", week, u.week_reset), ...(stale && u.seen ? [`측정 ${span(u.seen, -1)} 전, 오래된 값`] : []), ...note].join("\n"));
+      const line = (k, v, reset) => `${k} ${v == null ? T("측정 없음") : `${v}%`}${v != null && reset && parse(reset) > vnow ? T(", {t} 뒤 초기화", { t: span(reset, 1) }) : v === 0 && reset ? T(", 초기화됨") : ""}`;
+      const g = group(name.toLowerCase(), name, [line(T("5시간"), five, u.five_reset), line(T("주간"), week, u.week_reset), ...(stale && u.seen ? [T("측정 {t} 전, 오래된 값", { t: span(u.seen, -1) })] : []), ...note].join("\n"));
       const val = (v) => g.appendChild(el("b", `hl-v ${v == null ? "none" : stale ? "stale" : band(v)}`, v == null ? "--" : `${v}%`));
       val(five); g.appendChild(el("span", "hl-sl", "/")); val(week);
       if (stale) g.appendChild(el("span", "hl-q", "?"));
     };
     usage("Claude", h.claude, []);
     const cx = h.codex || {};
-    if (!cx.hidden) usage("Codex", h.codex, [...(!cx.measured && cx.cap ? [`실측 없음, 호출 수 어림 ${cx.calls}/${cx.cap}회`] : []), ...(cx.handover ? ["Claude가 이어받는 중"] : [])]);
+    if (!cx.hidden) usage("Codex", h.codex, [...(!cx.measured && cx.cap ? [T("실측 없음, 호출 수 어림 {a}/{b}회", { a: cx.calls, b: cx.cap })] : []), ...(cx.handover ? [T("Claude가 이어받는 중")] : [])]);
     const res = (name, used, total, title) => {
       const ok = used != null && total;
-      const g = group(name.toLowerCase(), name, ok ? `${title} ${used}/${total}GB, ${Math.round((used / total) * 100)}% 사용` : `${title} 측정 불가`);
+      const g = group(name.toLowerCase(), name, ok ? T("{title} {used}/{total}GB, {pct}% 사용", { title, used, total, pct: Math.round((used / total) * 100) }) : T("{title} 측정 불가", { title }));
       const gb = (v) => (v < 10 ? (+v).toFixed(1) : String(Math.round(v)));
       g.appendChild(el("b", `hl-v ${ok ? band((used / total) * 100) : "none"}`, ok ? `${gb(used)}/${Math.round(total)}G` : "--"));
     };
@@ -653,22 +655,22 @@
     const L = h.ledger || {};
     if (h.gpu && h.gpu.ok && h.gpu.total) {
       const used = +h.gpu.used || 0, total = +h.gpu.total, pct = (used / total) * 100;
-      const tips = [`GPU 메모리 실측 ${used}/${total}GB, ${Math.round(pct)}% 사용(nvidia-smi)`,
-        ...(L.rows || []).filter((r) => r.measured != null).map((r) => `${pname(r.project)} ${r.kind} 실측 ${r.measured}GB`),
-        ...(L.over ? [`실측이 예약보다 커 새 GPU 작업을 ${hhmm(parse(L.over.until))}까지 멈춤(${pname(L.over.project)})`] : [])];
+      const tips = [T("GPU 메모리 실측 {used}/{total}GB, {pct}% 사용(nvidia-smi)", { used, total, pct: Math.round(pct) }),
+        ...(L.rows || []).filter((r) => r.measured != null).map((r) => T("{p} {k} 실측 {gb}GB", { p: pname(r.project), k: r.kind, gb: r.measured })),
+        ...(L.over ? [T("실측이 예약보다 커 새 GPU 작업을 {t}까지 멈춤({p})", { t: hhmm(parse(L.over.until)), p: pname(L.over.project) })] : [])];
       const g = group("gpu", "GPU", tips.join("\n"));
       const bar = el("span", "gbar"), fill = el("i", `gseg use ${L.over ? "crit" : band(pct)}`);
       fill.style.width = `${Math.min(100, pct).toFixed(1)}%`; bar.appendChild(fill); g.appendChild(bar);
       const gbt = (v) => (v < 10 ? (+v).toFixed(1) : String(Math.round(v)));
       g.appendChild(el("b", `hl-v ${L.over ? "crit" : band(pct)}`, `${gbt(used)}/${Math.round(total)}G`));
-    } else res("GPU", h.gpu && h.gpu.ok ? h.gpu.used : null, h.gpu && h.gpu.ok ? h.gpu.total : null, "GPU 메모리");
+    } else res("GPU", h.gpu && h.gpu.ok ? h.gpu.used : null, h.gpu && h.gpu.ok ? h.gpu.total : null, T("GPU 메모리"));
     res("RAM", h.ram && h.ram.used, h.ram && h.ram.total, "RAM");
     // Ollama는 모델을 올렸을 때만 보인다. GPU 값이 왜 큰지 읽히게 한다. 서버만 켜져 있고 적재가 없으면 숨긴다
-    if ((h.ollama || []).length) group("ollama", "Ollama", `Ollama 켜짐, 적재 모델 ${h.ollama.join(", ")}`).appendChild(el("b", "hl-v", h.ollama.join(", ")));
+    if ((h.ollama || []).length) group("ollama", "Ollama", T("Ollama 켜짐, 적재 모델 {m}", { m: h.ollama.join(", ") })).appendChild(el("b", "hl-v", h.ollama.join(", ")));
   }
   const goQueue = () => { setTab("todo"); setTimeout(() => { const r = $("tfRes"); if (r) r.scrollIntoView({ block: "start" }); }, 50); };
   async function gpuAct(key, action, title) {
-    if (action === "cancel" && !window.confirm(`취소: ${title} 요청을 거둔다`)) return;
+    if (action === "cancel" && !window.confirm(T("취소: {t} 요청을 거둔다", { t: title }))) return;
     try {
       await fetch("/api/gpuqueue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, action }) });
     } catch (e) { /* 다음 갱신에서 서버 값으로 맞춘다 */ }
@@ -684,17 +686,17 @@
     drawHeadLine(data, vnow);
     // 동시 Cycle n/상한(261029-jipsa-17). GPU와 RAM 대기 수를 옆에 두고, 누르면 TODO 탭의 자원 상자로 간다
     const cap = data.cap || null, live = state.view === "live";
-    $("mode").textContent = live ? (cap ? `동시 Cycle ${cap.n}/${cap.cap}` : "동시 Cycle") : (data.demo ? "데모" : `지난 기록 ${data.date}`);
-    $("modePill").title = live && cap ? [`Cycle ${cap.n}개, 상한 ${cap.cap}개`, cap.stop || "", "누르면 TODO 탭의 자원으로 간다"].filter(Boolean).join("\n") : "";
+    $("mode").textContent = live ? (cap ? T("동시 Cycle {n}/{cap}", { n: cap.n, cap: cap.cap }) : T("동시 Cycle")) : (data.demo ? T("데모") : T("지난 기록 {d}", { d: data.date }));
+    $("modePill").title = live && cap ? [T("Cycle {n}개, 상한 {cap}개", { n: cap.n, cap: cap.cap }), cap.stop || "", T("누르면 TODO 탭의 자원으로 간다")].filter(Boolean).join("\n") : "";
     paintCap(cap, !live);
     // GPU 대기 n(261029-jipsa-17). GPU나 RAM이 모자라 대기열에 선 줄 수다. 누르면 TODO 탭의 자원 상자로 간다
     // 대기가 0이면 머리 줄에서 숨기고 설정 메뉴에만 둔다(42 초안 우선순위 9)
     const gq = $("gqPill"), nq = live && cap ? cap.queue || 0 : 0;
     gq.hidden = !live || !nq; gq.querySelector("b").textContent = String(nq); gq.classList.toggle("on", nq > 0);
-    $("gqMenu").textContent = `${nq}줄`; $("modeMenu").textContent = $("mode").textContent.replace(/^동시 Cycle\s*/, "") || "-";
+    $("gqMenu").textContent = T("{n}줄", { n: nq }); $("modeMenu").textContent = $("mode").textContent.replace(/^동시 Cycle\s*/, "").replace(/^Concurrent Cycles\s*/, "") || "-";
     if (state.view === "live" && typeof data.slack_on === "boolean") { // 설정 메뉴 안의 스위치. 이름과 상태를 같이 적는다(우선순위 17)
       const b = $("slackSw"); b.disabled = false; b.className = "slacksw " + (data.slack_on ? "on" : "off"); b.setAttribute("aria-pressed", String(data.slack_on));
-      $("slackTxt").textContent = data.slack_on ? "켜짐" : "꺼짐";
+      $("slackTxt").textContent = data.slack_on ? T("켜짐") : T("꺼짐");
     }
     $("cutoffNote").textContent = "";
     const counts = $("counts"); counts.textContent = "";
@@ -704,7 +706,7 @@
     if (state.view !== "live") { // 지난 기록이면 그날 실행의 상태 값으로 센다
       for (const [k, s, cls] of [["확인 필요", "확인 필요", "hold"], ["진행 중", "진행 중", "run"], ["실패", "실패", "fail"], ["완료", "완료", "done small"]]) {
         const v = (data.runs || []).filter((r) => r.status === s).length;
-        const c = el("span", `chip ${cls}${v ? "" : " zero"}`); c.appendChild(el("b", null, String(v))); c.appendChild(el("span", null, k)); counts.appendChild(c);
+        const c = el("span", `chip ${cls}${v ? "" : " zero"}`); c.appendChild(el("b", null, String(v))); c.appendChild(el("span", null, stName(k))); counts.appendChild(c);
       }
     } else drawStatusBar(counts, data, cue, vnow);
     const td = $("tabTodoN"); td.hidden = state.view !== "live" || !data.todo_file_n; td.textContent = String(data.todo_file_n ?? ""); // 할 일 파일 줄 수. 0이면 뱃지를 두지 않는다(우선순위 10)
@@ -740,19 +742,19 @@
     let divided = 0;
     for (const c of rows) {
       const ended = c.status === "끝", paused = c.state_text === "창 멈춤";
-      if (ended && !divided && rows.some((x) => x.status !== "끝")) { host.appendChild(el("div", "goal-sep", "끝난 목표")); divided = 1; } // 진행 중 줄과 펼친 끝난 줄 사이 구분선(261024-jipsa-21)
+      if (ended && !divided && rows.some((x) => x.status !== "끝")) { host.appendChild(el("div", "goal-sep", T("끝난 목표"))); divided = 1; } // 진행 중 줄과 펼친 끝난 줄 사이 구분선(261024-jipsa-21)
       const row = el("div", `goal-row${ended ? " ended" : paused ? " paused" : ""}`);
       const nm = el("div", "g-name");
-      if (ended) nm.appendChild(el("em", "g-end", `끝: ${c.end_reason || "끝"}`)); // 끝난 줄은 이름 칸 맨 앞에 끝 사유 표지
+      if (ended) nm.appendChild(el("em", "g-end", T("끝: {r}", { r: c.end_reason || T("끝") }))); // 끝난 줄은 이름 칸 맨 앞에 끝 사유 표지
       nm.appendChild(el("span", null, pname(c.project))); nm.appendChild(el("b", null, c.title));
-      nm.tabIndex = 0; tip(nm, () => [[c.title, ""], ["프로젝트", pname(c.project)]]); row.appendChild(nm); // 제목은 한 줄로 줄이고 전체는 툴팁으로 본다
+      nm.tabIndex = 0; tip(nm, () => [[c.title, ""], [T("프로젝트"), pname(c.project)]]); row.appendChild(nm); // 제목은 한 줄로 줄이고 전체는 툴팁으로 본다
       row.appendChild(el("div", "g-n", `Cycle ${c.rounds.length}`));
-      const rec = el("div", "g-rec"); rec.appendChild(document.createTextNode(`처음 ${f(c.first)} 최고 `)); rec.appendChild(el("b", null, f(c.best)));
-      if (c.target != null) rec.appendChild(document.createTextNode(` / 목표 ${f(c.target)} ${c.direction || "이상"}`));
+      const rec = el("div", "g-rec"); rec.appendChild(document.createTextNode(T("처음 {a} 최고 ", { a: f(c.first) }))); rec.appendChild(el("b", null, f(c.best)));
+      if (c.target != null) rec.appendChild(document.createTextNode(T(" / 목표 {t} {d}", { t: f(c.target), d: T(c.direction || "이상") })));
       row.appendChild(rec);
       row.appendChild(goalSpark(c));
-      const who = el("div", "g-who", `주체 ${c.owner_text || "작업자"}`);
-      if ((c.moves || []).length) { who.textContent += ` (이동 ${c.moves.length})`; who.title = c.moves.join("\n"); }
+      const who = el("div", "g-who", T("주체 {o}", { o: c.owner_text || T("작업자") }));
+      if ((c.moves || []).length) { who.textContent += T(" (이동 {n})", { n: c.moves.length }); who.title = c.moves.join("\n"); }
       row.appendChild(who);
       const gs = el("div", `g-state ${ended ? "ended" : paused ? "paused" : "live"}${c.final && c.final.shown === "확인 필요" ? " cue" : ""}`, c.where || c.state_text || c.phase);
       gs.title = c.state_text || ""; if (c.final) { gs.style.cursor = "pointer"; gs.addEventListener("click", () => openResult(c.final.run_id)); }
@@ -760,23 +762,23 @@
       host.appendChild(row);
     }
     if (!hid.length) return;
-    const fold = el("button", "goal-fold", `${open ? "▾" : "▸"} 끝난 목표 ${hid.length}개 (보기 범위 밖) ${open ? "접기" : "펼치기"}`);
+    const fold = el("button", "goal-fold", `${open ? "▾" : "▸"} ${T("끝난 목표 {n}개 (보기 범위 밖)", { n: hid.length })} ${open ? T("접기") : T("펼치기")}`);
     fold.type = "button"; fold.setAttribute("aria-expanded", String(open)); fold.addEventListener("click", toggleGoalsDone);
     host.insertBefore(fold, open ? host.children[shown.length + divided] : null); // 펼치면 접힘 줄 아래에 끝난 목표가 온다
   }
   function goalSpark(c) {
     const W = 130, H = 30, P = 4;
-    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "goal-spark", role: "img", "aria-label": "Cycle별 지표 추이" });
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "goal-spark", role: "img", "aria-label": T("Cycle별 지표 추이") });
     const sp = scorePts(c); // 시작값과 Cycle별 다시 잰 값(6안과 같은 자료)
     const pts = (sp.start != null ? [{ n: 0, s: sp.start, adopt: true }] : []).concat(sp.pts);
     const vals = pts.map((p) => p.s).concat(c.target != null ? [c.target] : []);
-    if (!pts.length) { const t = svgEl("text", { x: 2, y: H / 2 + 4, class: "lb" }); t.textContent = "지표 없음"; svg.appendChild(t); return svg; }
+    if (!pts.length) { const t = svgEl("text", { x: 2, y: H / 2 + 4, class: "lb" }); t.textContent = T("지표 없음"); svg.appendChild(t); return svg; }
     const lo = Math.min(...vals), hi = Math.max(...vals), maxN = Math.max(1, ...pts.map((p) => p.n)), minN = Math.min(...pts.map((p) => p.n));
     const x = (n) => P + ((W - 2 * P) * (n - minN)) / Math.max(1, maxN - minN), y = (v) => H - P - ((H - 2 * P) * (v - lo)) / Math.max(1e-9, hi - lo);
     if (c.target != null) svg.appendChild(svgEl("line", { x1: P, x2: W - P, y1: y(c.target), y2: y(c.target), class: "tg" }));
     svg.appendChild(svgEl("path", { d: pts.map((p, i) => `${i ? "L" : "M"}${x(p.n)},${y(p.s)}`).join(" "), class: "ln" }));
     for (const p of pts) svg.appendChild(svgEl("circle", { cx: x(p.n), cy: y(p.s), r: 2.6, class: `pt${p.adopt ? " adopt" : ""}` }));
-    svg.appendChild(svgEl("title", {})).textContent = pts.map((p) => `${p.n ? `Cycle ${p.n}` : "시작"} ${p.s}${p.adopt ? " 채택" : ""}`).join(", ");
+    svg.appendChild(svgEl("title", {})).textContent = pts.map((p) => `${p.n ? `Cycle ${p.n}` : T("시작")} ${p.s}${p.adopt ? T(" 채택") : ""}`).join(", ");
     return svg;
   }
 
@@ -821,7 +823,7 @@
   // 줄 끝 ⋯ 메뉴(42 초안 구역 13, 우선순위 18): 덜 쓰는 단추(지우기, Cycle 고치기, 피드백)를 묶는다. 하나만 열리고 바깥을 누르면 닫힌다
   let tfMenuOpen = null; // 열린 메뉴의 줄 key
   function tfMore(key, items) {
-    const b = tfButton("⋯", "지우기, Cycle 고치기, 피드백", (ev) => { ev.stopPropagation(); const open = tfMenuOpen === key; closeTfMenu(); if (!open) openTfMenu(b, key, items); });
+    const b = tfButton("⋯", T("지우기, Cycle 고치기, 피드백"), (ev) => { ev.stopPropagation(); const open = tfMenuOpen === key; closeTfMenu(); if (!open) openTfMenu(b, key, items); });
     b.classList.add("more"); b.setAttribute("aria-haspopup", "true"); b.setAttribute("aria-expanded", "false");
     if (tfMenuOpen === key) setTimeout(() => openTfMenu(b, key, items), 0); // 다시 그려도 열린 메뉴는 유지한다
     return b;
@@ -837,9 +839,9 @@
   function tfBtns(r) {
     const bs = el("div", "btns"), more = [];
     for (const [label, name, what] of TF_BTNS[r.item.section] || []) {
-      const b = tfButton(label, `${what} (jipsa ${name} ${r.item.no})`, () => {
+      const b = tfButton(T(label), `${T(what)} (jipsa ${name} ${r.item.no})`, () => {
         closeTfMenu();
-        if (name === "todo rm" && !window.confirm(`할 일 파일에서 이 줄을 지운다.\n\n${r.text.trim()}`)) return;
+        if (name === "todo rm" && !window.confirm(T("할 일 파일에서 이 줄을 지운다.\n\n{t}", { t: r.text.trim() }))) return;
         const rsv = label === "예약";
         if (name === "todo run" && (rsv || (r.cells && r.cells.cycle))) { // 예약과 Cycle Do는 줄 아래 칸을 펼치고 닫는다
           const same = tfDo && tfDo.key === r.item.key && tfDo.rsv === rsv;
@@ -847,14 +849,14 @@
           tfCyc = null;
           tfTodoSig = ""; drawTodoFile(state.data && state.data.todofile); return;
         }
-        if (name === "todo run" && !window.confirm(`이 줄 하나를 지금 작업자로 돌린다. 시키면 할 일에서 빠지고 현황판에 보인다.\n\n${r.text.trim()}`)) return;
+        if (name === "todo run" && !window.confirm(T("이 줄 하나를 지금 작업자로 돌린다. 시키면 할 일에서 빠지고 현황판에 보인다.\n\n{t}", { t: r.text.trim() }))) return;
         tfRun({ name, key: r.item.key }, "tfTodoSec");
       }, name === "todo rm");
       if (name === "todo run") {
         b.classList.add(label === "예약" ? "rsv" : "do");
         if (tfDo && tfDo.key === r.item.key && tfDo.rsv === (label === "예약")) b.classList.add("on");
         bs.appendChild(b);
-      } else { b.textContent = "지우기"; more.push(b); } // Rm은 ⋯ 메뉴 안이다
+      } else { b.textContent = T("지우기"); more.push(b); } // Rm은 ⋯ 메뉴 안이다
     }
     if (r.cells) more.push(tfCycEditBtn(r));
     if (r.cells && r.cells.cycle) more.push(tfFbBtn(r)); // 사람 피드백(261026-jipsa-19). 입력 줄 없이 프롬프트 창 하나
@@ -870,10 +872,10 @@
       i.addEventListener("input", () => { tfDo[k] = i.value; });
       f.appendChild(el("span", "k", label)); f.appendChild(i); return i;
     };
-    const first = tfDo.rsv ? inp("start", "시각", "22:00, +30m") : null;
-    if (cyc) inp("until", "마감", "07:00, +4h");
-    const ok = el("button", "tf-btn do", tfDo.rsv ? "예약하기" : "시키기"); ok.type = "submit";
-    ok.title = `jipsa todo run ${r.item.no}${tfDo.rsv ? " 시작 <시각>" : ""}${cyc ? " 마감 <시각>" : ""}`;
+    const first = tfDo.rsv ? inp("start", T("시각"), "22:00, +30m") : null;
+    if (cyc) inp("until", T("마감"), "07:00, +4h");
+    const ok = el("button", "tf-btn do", tfDo.rsv ? T("예약하기") : T("시키기")); ok.type = "submit";
+    ok.title = `jipsa todo run ${r.item.no}${tfDo.rsv ? T(" 시작 <시각>") : ""}${cyc ? T(" 마감 <시각>") : ""}`;
     f.appendChild(ok);
     f.addEventListener("submit", (ev) => {
       ev.preventDefault();
@@ -898,8 +900,8 @@
   }
   function tfCycBtn(r) {
     const no = r.item.no, v = r.cells.cycle, on = !!v;
-    const b = tfButton("Cycle", on ? `Cycle 켜짐: ${v}. 눌러 끈다 (jipsa todo cycle ${no} off)` : `눌러 Cycle을 켠다. 지표와 목표값은 첫 분석이 정한다 (jipsa todo cycle ${no})`, () => {
-      if (on && !(tfCycParse(v) || {}).pending && !window.confirm(`Cycle을 끈다. 적힌 지표와 목표값이 지워진다.\n\n${v}`)) return;
+    const b = tfButton("Cycle", on ? T("Cycle 켜짐: {v}. 눌러 끈다 (jipsa todo cycle {no} off)", { v, no }) : T("눌러 Cycle을 켠다. 지표와 목표값은 첫 분석이 정한다 (jipsa todo cycle {no})", { no }), () => {
+      if (on && !(tfCycParse(v) || {}).pending && !window.confirm(T("Cycle을 끈다. 적힌 지표와 목표값이 지워진다.\n\n{v}", { v }))) return;
       tfRun(on ? { name: "todo cycle", key: r.item.key, off: true } : { name: "todo cycle", key: r.item.key, metric: "", target: "", dir: "", cap: "" }, "tfTodoSec");
     });
     if (on) { b.classList.add("on"); b.setAttribute("aria-pressed", "true"); } else b.setAttribute("aria-pressed", "false");
@@ -908,7 +910,7 @@
   // Cycle 값 고치기(261103-jipsa-07). 지표, 목표값, 방향, 상한, 끝 조건을 줄 아래 칸에서 고친다. 비운 칸은 첫 분석이 정한다. 도는 줄은 서버가 거절한다
   function tfCycEditBtn(r) {
     const v = r.cells.cycle;
-    return tfButton(v ? "Cycle 값 고치기" : "Cycle 값 넣기", `지표, 목표값, 상한을 고친다 (jipsa todo cycle ${r.item.no} <지표> <목표값> 상한 N)`, () => {
+    return tfButton(v ? T("Cycle 값 고치기") : T("Cycle 값 넣기"), T("지표, 목표값, 상한을 고친다 (jipsa todo cycle {no} <지표> <목표값> 상한 N)", { no: r.item.no }), () => {
       closeTfMenu();
       const p = tfCycParse(v) || {}, same = tfCyc && tfCyc.key === r.item.key;
       tfCyc = same ? null : { key: r.item.key, metric: p.metric || "", target: p.target || "", dir: p.dir || "", cap: p.cap || "", stop: /도달하면 끝$/.test(v || "") };
@@ -922,16 +924,16 @@
       i.addEventListener("input", () => { tfCyc[k] = i.value; });
       f.appendChild(el("span", "k", label)); f.appendChild(i); return i;
     };
-    const first = inp("metric", "지표", "첫 화면 ms");
-    inp("target", "목표값", "800");
-    const d = el("select", null); d.setAttribute("aria-label", "방향");
-    for (const [v, t] of [["", "방향 자동"], ["이상", "이상"], ["이하", "이하"]]) { const o = el("option", null, t); o.value = v; d.appendChild(o); }
+    const first = inp("metric", T("지표"), T("첫 화면 ms"));
+    inp("target", T("목표값"), "800");
+    const d = el("select", null); d.setAttribute("aria-label", T("방향"));
+    for (const [v, t] of [["", "방향 자동"], ["이상", "이상"], ["이하", "이하"]]) { const o = el("option", null, T(t)); o.value = v; d.appendChild(o); }
     d.value = tfCyc.dir; d.addEventListener("change", () => { tfCyc.dir = d.value; }); f.appendChild(d);
-    inp("cap", "상한", "4");
+    inp("cap", T("상한"), "4");
     const lb = el("label", "k"), c = el("input", null); c.type = "checkbox"; c.checked = tfCyc.stop;
-    c.addEventListener("change", () => { tfCyc.stop = c.checked; }); lb.append(c, " 도달하면 끝"); f.appendChild(lb);
-    const ok = el("button", "tf-btn do", "저장"); ok.type = "submit"; f.appendChild(ok);
-    f.appendChild(tfButton("취소", "고치기 칸을 닫는다", () => { tfCyc = null; tfTodoSig = ""; drawTodoFile(state.data && state.data.todofile); }));
+    c.addEventListener("change", () => { tfCyc.stop = c.checked; }); lb.append(c, T(" 도달하면 끝")); f.appendChild(lb);
+    const ok = el("button", "tf-btn do", T("저장")); ok.type = "submit"; f.appendChild(ok);
+    f.appendChild(tfButton(T("취소"), T("고치기 칸을 닫는다"), () => { tfCyc = null; tfTodoSig = ""; drawTodoFile(state.data && state.data.todofile); }));
     f.addEventListener("submit", (ev) => {
       ev.preventDefault();
       tfRun({ name: "todo cycle", key: r.item.key, metric: tfCyc.metric.trim(), target: tfCyc.target.trim(), dir: tfCyc.dir, cap: tfCyc.cap.trim(), stop: tfCyc.stop }, "tfTodoSec");
@@ -940,14 +942,14 @@
     return f;
   }
   function tfFbBtn(r) {
-    return tfButton("피드백", `Cycle의 돌고 있는 단계와 다음 분석, 명령에 사람 피드백을 넣는다. 지표와 목표값은 바뀌지 않는다 (jipsa todo feedback ${r.item.no} | 글)`, () => {
-      const t = window.prompt(`이 Cycle의 다음 분석과 명령에 넣을 피드백을 적는다. 돌고 있는 단계에도 다음 구간부터 닿는다. 지표와 목표값은 바뀌지 않는다.\n\n${r.text.trim()}`);
+    return tfButton(T("피드백"), T("Cycle의 돌고 있는 단계와 다음 분석, 명령에 사람 피드백을 넣는다. 지표와 목표값은 바뀌지 않는다 (jipsa todo feedback {no} | 글)", { no: r.item.no }), () => {
+      const t = window.prompt(T("이 Cycle의 다음 분석과 명령에 넣을 피드백을 적는다. 돌고 있는 단계에도 다음 구간부터 닿는다. 지표와 목표값은 바뀌지 않는다.\n\n{t}", { t: r.text.trim() }));
       if (t && t.trim()) tfRun({ name: "todo feedback", key: r.item.key, text: t.trim() }, "tfTodoSec");
     });
   }
   function tfCycMark(v) { // 번호 왼쪽 C 표시. 칸 글이 툴팁이다
     const m = tfCycParse(v), c = el("b", `cm${m && m.pending ? " pend" : ""}`, "C");
-    c.title = `Cycle 켜짐: ${v}${m && m.pending ? ". 비운 칸은 Cycle 1 분석이 정해 이 줄에 채운다" : ""}`;
+    c.title = T("Cycle 켜짐: {v}", { v }) + (m && m.pending ? T(". 비운 칸은 Cycle 1 분석이 정해 이 줄에 채운다") : "");
     return c;
   }
   const g1 = (v) => (v == null || isNaN(v) ? "-" : (+v).toFixed(1));
@@ -967,7 +969,7 @@
     rounds.forEach((r, i) => {
       if (r.score == null) return;
       const c = mk("circle", { cx: X(i), cy: Y(r.score), r: 2.5, fill: r.adopt ? "var(--run)" : "var(--surface)", stroke: "var(--run)" });
-      const t = document.createElementNS(ns, "title"); t.textContent = `Cycle ${r.n} ${fmtv(r.score)}${r.adopt ? ", 채택" : ""}`; c.appendChild(t);
+      const t = document.createElementNS(ns, "title"); t.textContent = `Cycle ${r.n} ${fmtv(r.score)}${r.adopt ? T(", 채택") : ""}`; c.appendChild(t);
     });
     return svg;
   }
@@ -982,22 +984,22 @@
   function drawRes(L) {
     const box = $("tfRes"); box.textContent = "";
     const g = L.gpu || {};
-    if (g.over) box.appendChild(el("div", "rb why", `GPU 실측이 커 새 GPU 작업을 ${hhmm(parse(g.over.until))}까지 멈춘다(${pname(g.over.project)})`));
+    if (g.over) box.appendChild(el("div", "rb why", T("GPU 실측이 커 새 GPU 작업을 {t}까지 멈춘다({p})", { t: hhmm(parse(g.over.until)), p: pname(g.over.project) })));
     const q = L.queue || [], qs = el("div", "q");
-    qs.appendChild(el("h2", null, "대기열"));
+    qs.appendChild(el("h2", null, T("대기열")));
     q.forEach((r, i) => qs.appendChild(tfLine(el("span", "no", String(i + 1)), r.project, r.title,
-      tfButton("빼기", "대기열에서 빼고 요청을 거둔다", () => gpuAct(r.key, "cancel", r.title), true))));
-    if (!q.length) qs.appendChild(el("div", "hint pad", "없다"));
+      tfButton(T("빼기"), T("대기열에서 빼고 요청을 거둔다"), () => gpuAct(r.key, "cancel", r.title), true))));
+    if (!q.length) qs.appendChild(el("div", "hint pad", T("없다")));
     box.appendChild(qs);
     const sch = L.scheduled || [], ss = el("div", "q");
-    ss.appendChild(el("h2", null, "예약"));
+    ss.appendChild(el("h2", null, T("예약")));
     for (const c of sch) {
       const at = el("span", "no wide", hhmm(parse(c.start)));
-      if (c.cycle) at.title = `${hhmm(parse(c.start))}에 시작, 마감 ${hhmm(parse(c.cutoff))}`;
+      if (c.cycle) at.title = T("{a}에 시작, 마감 {b}", { a: hhmm(parse(c.start)), b: hhmm(parse(c.cutoff)) });
       ss.appendChild(tfLine(at, c.project, c.text,
-        tfButton("빼기", `예약을 지우고 할 일로 둔다 (jipsa todo stop ${c.no})`, () => tfRun({ name: "todo stop", key: c.key }, "tfTodoSec"), true)));
+        tfButton(T("빼기"), T("예약을 지우고 할 일로 둔다 (jipsa todo stop {no})", { no: c.no }), () => tfRun({ name: "todo stop", key: c.key }, "tfTodoSec"), true)));
     }
-    if (!sch.length) ss.appendChild(el("div", "hint pad", "없다"));
+    if (!sch.length) ss.appendChild(el("div", "hint pad", T("없다")));
     box.appendChild(ss);
   }
   function drawNow(L) {
@@ -1011,34 +1013,34 @@
       nm.appendChild(el("div", "meta", pname(c.project)));
       const st = el("span", `st ${c.state === "closing" ? "stop" : c.running ? "run" : "todo"}`); st.appendChild(el("i")); st.append(c.paused || c.where || c.note); st.title = c.note; nm.appendChild(st);
       if (c.branch || c.branch_open || c.branch_closed) {
-        const br = el("div", "br", "갈래 "); br.appendChild(el("b", null, c.branch || "-"));
-        if (c.branch_open || c.branch_closed) br.appendChild(el("span", "hint", ` 열림 ${c.branch_open}, 닫힘 ${c.branch_closed}`)); // 둘 다 0이면 이름만 둔다
+        const br = el("div", "br", T("갈래 ")); br.appendChild(el("b", null, c.branch || "-"));
+        if (c.branch_open || c.branch_closed) br.appendChild(el("span", "hint", T(" 열림 {a}, 닫힘 {b}", { a: c.branch_open, b: c.branch_closed }))); // 둘 다 0이면 이름만 둔다
         nm.appendChild(br);
       }
       const reached = c.score != null && c.target != null && (c.direction === "이하" ? c.score <= c.target : c.score >= c.target);
       const met = el("div", "met");
-      met.appendChild(el("span", null, c.metric || "지표 미정")); met.append(" 지금 ");
+      met.appendChild(el("span", null, c.metric || T("지표 미정"))); met.append(T(" 지금 "));
       met.appendChild(el("b", reached ? "ok" : null, `${fmtv(c.score)} `)); // 잰 값이 없으면 "-"다. 회차 수는 아래 진척 막대 옆에 있다
-      met.appendChild(el("span", "tg", `목표 ${c.target == null ? "미정" : `${fmtv(c.target)} ${c.direction}`}`)); nm.appendChild(met);
+      met.appendChild(el("span", "tg", T("목표 {t}", { t: c.target == null ? T("미정") : `${fmtv(c.target)} ${T(c.direction)}` }))); nm.appendChild(met);
       const pct = Math.round((c.progress || 0) * 100), pb = el("div", "pbar"), bar = el("div", `bar${reached ? " good" : ""}`), fill = el("div");
-      fill.style.width = `${pct}%`; bar.appendChild(fill); bar.title = `시작에서 마감까지 ${pct}% 지남`;
-      pb.append(bar, `${(c.rounds || []).filter((r) => r.judge).length}회차`); nm.appendChild(pb);
+      fill.style.width = `${pct}%`; bar.appendChild(fill); bar.title = T("시작에서 마감까지 {n}% 지남", { n: pct });
+      pb.append(bar, T("{n}회차", { n: (c.rounds || []).filter((r) => r.judge).length })); nm.appendChild(pb);
       // GPU와 RAM 배지는 뗐다(261029-jipsa-20). 실측은 머리 줄에 있다. 새 GPU 작업을 막는 관찰만 배지로 남긴다
       if (c.signal) {
         const chips = el("div", "chips");
-        chips.appendChild(el("span", "chip sig", `큰 GPU 일 관찰 중${c.signal.until ? `, ${hhmm(parse(c.signal.until))}까지` : ""}. 새 GPU 작업을 막는다`));
+        chips.appendChild(el("span", "chip sig", T("큰 GPU 일 관찰 중{u}. 새 GPU 작업을 막는다", { u: c.signal.until ? T(", {t}까지", { t: hhmm(parse(c.signal.until)) }) : "" })));
         nm.appendChild(chips);
       }
       lane.appendChild(nm);
       const sk = el("div", "sk"), svg = tfSpark(c.rounds || [], c.target);
-      if (svg) { sk.appendChild(svg); sk.title = "회차별 값, 점선은 목표"; } // 잰 회차가 없으면 비워 둔다. 0회차가 아래에 보인다
+      if (svg) { sk.appendChild(svg); sk.title = T("회차별 값, 점선은 목표"); } // 잰 회차가 없으면 비워 둔다. 0회차가 아래에 보인다
       lane.appendChild(sk);
       // 피드백 칸(261029-jipsa-19). 결과지 서랍의 답 넣기 칸과 같은 여러 줄 칸이다. Enter는 줄바꿈, Ctrl+Enter는 넣기.
       // 줄마다 되풀이되던 키 안내와 글자 수는 뗐다(261029-jipsa-20). 키 안내는 빈 칸의 자리 글이다
       const fb = el("div", "fb"), fr = el("form", "fbr"); fr.autocomplete = "off";
-      const fi = el("textarea", null); fi.rows = 3; fi.placeholder = "Ctrl+Enter로 넣기"; fi.setAttribute("aria-label", "피드백");
+      const fi = el("textarea", null); fi.rows = 3; fi.placeholder = T("Ctrl+Enter로 넣기"); fi.setAttribute("aria-label", T("피드백"));
       fi.value = tfFbDraft[c.key] || "";
-      const row = el("div", "answer-row"), fbB = el("button", "tf-btn", "피드백 넣기"); fbB.type = "submit";
+      const row = el("div", "answer-row"), fbB = el("button", "tf-btn", T("피드백 넣기")); fbB.type = "submit";
       row.append(fbB);
       fr.append(fi, row);
       fi.addEventListener("input", () => { tfFbDraft[c.key] = fi.value; });
@@ -1062,19 +1064,19 @@
       lane.appendChild(fb);
       const act = el("div", "act");
       const kv = (k, node) => { const d = el("div", "kv"); d.appendChild(el("span", null, k)); d.append(node); act.appendChild(d); };
-      kv("시작", hhmm(parse(c.start)));
-      const ui = el("input", null); ui.type = "text"; ui.value = hhmm(parse(c.cutoff)); ui.setAttribute("aria-label", "마감"); ui.title = "HH:MM이나 +2h로 고치고 Enter. 돌던 단계는 끊지 않는다";
+      kv(T("시작"), hhmm(parse(c.start)));
+      const ui = el("input", null); ui.type = "text"; ui.value = hhmm(parse(c.cutoff)); ui.setAttribute("aria-label", T("마감")); ui.title = T("HH:MM이나 +2h로 고치고 Enter. 돌던 단계는 끊지 않는다");
       ui.addEventListener("change", () => { if (ui.value.trim()) tfRun({ name: "todo until", key: c.key, until: ui.value.trim() }, "tfTodoSec"); });
-      kv("마감", ui);
-      act.appendChild(el("div", "hint", `끝 예상 ${hhmm(parse(c.est_end))}`));
-      const sb = tfButton("멈추기", "돌던 단계를 마치고 마감 결과지를 쓴 뒤 할 일로 돌린다. 다시 시키면 멈춘 자리부터 잇는다(판정까지 마친 회차면 다음 회차, 아니면 그 회차의 남은 단계) (jipsa todo stop)", () => {
-        if (window.confirm(`이 Cycle을 멈춘다. 돌던 단계는 끝까지 두고 할 일로 돌아온다.\n\n${c.text}`)) tfRun({ name: "todo stop", key: c.key }, "tfTodoSec");
+      kv(T("마감"), ui);
+      act.appendChild(el("div", "hint", T("끝 예상 {t}", { t: hhmm(parse(c.est_end)) })));
+      const sb = tfButton(T("멈추기"), T("돌던 단계를 마치고 마감 결과지를 쓴 뒤 할 일로 돌린다. 다시 시키면 멈춘 자리부터 잇는다(판정까지 마친 회차면 다음 회차, 아니면 그 회차의 남은 단계) (jipsa todo stop)"), () => {
+        if (window.confirm(T("이 Cycle을 멈춘다. 돌던 단계는 끝까지 두고 할 일로 돌아온다.\n\n{t}", { t: c.text }))) tfRun({ name: "todo stop", key: c.key }, "tfTodoSec");
       }, true);
-      if (c.stopped || c.state === "closing") { sb.disabled = true; sb.textContent = "닫는 중"; }
+      if (c.stopped || c.state === "closing") { sb.disabled = true; sb.textContent = T("닫는 중"); }
       act.appendChild(sb); lane.appendChild(act);
       box.appendChild(lane);
     }
-    if (!cs.length) box.appendChild(el("div", "hint pad", "없다"));
+    if (!cs.length) box.appendChild(el("div", "hint pad", T("없다")));
   }
   function drawBand(L) {
     const band = $("tfBand"), focus = document.activeElement;
@@ -1094,15 +1096,15 @@
     const line = $("tfLine"); line.textContent = "";
     const q = L.queue || [], sch = L.scheduled || [], cs = L.cycles || [], g = L.gpu || {};
     const item = (k, rows, text) => {
-      const s = el("span", rows.length ? "it" : null); s.append(`${k} `); s.appendChild(el("b", null, rows.length ? String(rows.length) : "없음"));
-      if (rows.length) { s.append(" "); s.appendChild(el("span", "mono", text(rows[0]))); if (rows.length > 1) s.append(` 외 ${rows.length - 1}`); s.title = rows.map(text).join("\n"); }
+      const s = el("span", rows.length ? "it" : null); s.append(`${T(k)} `); s.appendChild(el("b", null, rows.length ? String(rows.length) : T("없음")));
+      if (rows.length) { s.append(" "); s.appendChild(el("span", "mono", text(rows[0]))); if (rows.length > 1) s.append(T(" 외 {n}", { n: rows.length - 1 })); s.title = rows.map(text).join("\n"); }
       line.appendChild(s);
     };
-    if (g.over) line.appendChild(el("span", "it why", `GPU 실측이 커 새 GPU 작업을 ${hhmm(parse(g.over.until))}까지 멈춘다`));
+    if (g.over) line.appendChild(el("span", "it why", T("GPU 실측이 커 새 GPU 작업을 {t}까지 멈춘다", { t: hhmm(parse(g.over.until)) })));
     item("대기열", q, (r) => `${pname(r.project)} ${r.title}`);
     item("예약", sch, (c) => `${pname(c.project)} ${hhmm(parse(c.start))} ${c.text}`);
     item("Cycle", cs, (c) => `${pname(c.project)} ${c.text}${c.where ? `, ${c.where}` : ""}`);
-    const b = el("button", "lnk", bandOpen() ? "접기" : "펼치기"); b.type = "button"; b.title = "대기열 빼기, 예약 빼기, Cycle 마감과 피드백과 멈추기";
+    const b = el("button", "lnk", bandOpen() ? T("접기") : T("펼치기")); b.type = "button"; b.title = T("대기열 빼기, 예약 빼기, Cycle 마감과 피드백과 멈추기");
     b.addEventListener("click", () => { setBandOpen(!bandOpen()); tfBandSig = ""; drawBand(state.data && state.data.todofile ? state.data.todofile.lanes || {} : {}); });
     line.appendChild(b);
   }
@@ -1130,8 +1132,8 @@
         const cy = r.cycle;
         if (cy && (cy.rounds || []).length) { // 앞서 돈 Cycle 줄은 회차 수와 지금 값을 보인다. 다시 시키면 멈춘 자리부터 잇는다(판정까지 마친 회차면 다음 회차, 아니면 그 회차의 남은 단계)
           const m = el("div", "met"), p = tfCycParse(c.cycle) || {};
-          m.append(`${cy.rounds.length}회차 돎. ${p.metric || "지표"} 지금 `); m.appendChild(el("b", null, fmtv(cy.score)));
-          if (p.target) m.appendChild(el("span", "tg", `목표 ${p.target} ${p.dir || "이상"}`));
+          m.append(T("{n}회차 돎. {m} 지금 ", { n: cy.rounds.length, m: p.metric || T("지표") })); m.appendChild(el("b", null, fmtv(cy.score)));
+          if (p.target) m.appendChild(el("span", "tg", T("목표 {t}", { t: `${p.target} ${T(p.dir || "이상")}` })));
           main.appendChild(m);
         }
         if (cy && cy.paused) main.appendChild(el("div", "tf-note pause", cy.paused));
@@ -1174,9 +1176,9 @@
     if ((tfFilt === "ran" && !nr) || (tfFilt === "cycle" && !nc0)) tfFilt = "all";
     const tRows = all.filter((r) => tfFilt === "ran" ? ran(r) : !ran(r) && (tfFilt === "all" || (r.cells && r.cells.cycle)));
     const nc = nc0, nt = all.filter((r) => r.cells && !ran(r)).length;
-    $("tfTodoN").textContent = nc ? `${nt}건, Cycle ${nc}` : `${nt}건`;
+    $("tfTodoN").textContent = nc ? T("{n}건, Cycle {c}", { n: nt, c: nc }) : T("{n}건", { n: nt });
     const rb = document.querySelector('#tfFilter button[data-f="ran"]');
-    rb.hidden = !nr; rb.textContent = `지난 Cycle ${nr}`; rb.title = "한 번 돈 Cycle 줄. 결과지는 타임라인에 있고, Do로 멈춘 자리부터 잇는다";
+    rb.hidden = !nr; rb.textContent = T("지난 Cycle {n}", { n: nr }); rb.title = T("한 번 돈 Cycle 줄. 결과지는 타임라인에 있고, Do로 멈춘 자리부터 잇는다");
     document.querySelector('#tfFilter button[data-f="cycle"]').hidden = !nc;
     $("tfFilter").hidden = !nc && !nr; // 고를 것이 없으면 숨긴다
     for (const x of document.querySelectorAll("#tfFilter button")) x.classList.toggle("on", x.dataset.f === tfFilt);
@@ -1185,7 +1187,7 @@
     const focus = document.activeElement, typing = focus && $("tfTodo").contains(focus) && focus.tagName === "INPUT";
     const tSig = JSON.stringify([tRows, tfDo && tfDo.key, tfCyc && tfCyc.key]);
     if (tSig !== tfTodoSig && !typing) { // 입력 중인 값을 주기 새로 그리기가 지우지 않게 한다
-      tfList($("tfTodo"), tRows, tfFilt === "all" ? `할 일이 없다. 위 넣기 칸으로 넣는다${nr ? `. 한 번 돈 Cycle ${nr}건은 지난 Cycle에 있다` : ""}` : "보일 줄이 없다");
+      tfList($("tfTodo"), tRows, tfFilt === "all" ? T("할 일이 없다. 위 넣기 칸으로 넣는다") + (nr ? T(". 한 번 돈 Cycle {n}건은 지난 Cycle에 있다", { n: nr }) : "") : T("보일 줄이 없다"));
       tfTodoSig = tSig;
     }
   }
@@ -1203,7 +1205,7 @@
     if (sig === tfPlaceSig) return;
     tfPlaceSig = sig; box.textContent = ""; box.hidden = !rows.length;
     for (const p of rows) {
-      const l = el("div", "tf-pl"), st = el("span", "st run"); st.appendChild(el("i")); st.append(p.session ? "세션에 넣는 중" : "스케줄러에 넣는 중");
+      const l = el("div", "tf-pl"), st = el("span", "st run"); st.appendChild(el("i")); st.append(p.session ? T("세션에 넣는 중") : T("스케줄러에 넣는 중"));
       const sp = el("span", "sp"); sp.appendChild(el("span", "pj", pname(p.project))); sp.append(` ${p.cycle ? "Cycle " : ""}${p.text}`);
       const nt = el("span", "nt", p.note.replace(/^[^.]*\.\s*/, ""));
       l.title = `${pname(p.project)} ${p.text}\n${p.note}`; l.append(st, sp, nt); box.appendChild(l);
@@ -1226,7 +1228,7 @@
     const panel = $("tfPanel"); panel.classList.add("busy");
     for (const b of panel.querySelectorAll("button")) b.disabled = true;
     let d;
-    try { d = await postJson("/api/command", body); } catch (e) { d = { ok: false, out: "서버에 닿지 못했다" }; }
+    try { d = await postJson("/api/command", body); } catch (e) { d = { ok: false, out: T("서버에 닿지 못했다") }; }
     tfGen++;
     const box = $("tfOutBox"), sec = $(secId);
     if (sec && box.parentNode !== sec) sec.insertBefore(box, sec.querySelector(".tf-list"));
@@ -1266,7 +1268,7 @@
     if (!name) { $("tfNewName").focus(); return; }
     btn.disabled = true;
     let d;
-    try { d = await postJson("/api/project", { name }); } catch (e) { d = { ok: false, text: "만들지 못했다: 서버에 닿지 못했다" }; }
+    try { d = await postJson("/api/project", { name }); } catch (e) { d = { ok: false, text: T("만들지 못했다: 서버에 닿지 못했다") }; }
     btn.disabled = false;
     out.hidden = false; out.className = `tf-new-out ${d.ok ? "ok" : "fail"}`; out.textContent = d.text || "";
     if (d.ok) {
@@ -1284,14 +1286,14 @@
   // 할 일로는 줄 아래에 프로젝트와 기준을 받는 줄을 연다. 메모가 이미 프로젝트 | 할 일 꼴이면 프로젝트를 고르지 않고 올린다
   function memoUpRow(m, projects) {
     const row = el("div", "tf-row tf-up"), form = el("form", null); form.autocomplete = "off";
-    const sel = el("select", null); sel.setAttribute("aria-label", "올릴 프로젝트");
-    const none = el("option", null, "프로젝트 고르기"); none.value = ""; sel.appendChild(none);
+    const sel = el("select", null); sel.setAttribute("aria-label", T("올릴 프로젝트"));
+    const none = el("option", null, T("프로젝트 고르기")); none.value = ""; sel.appendChild(none);
     for (const p of projects) { const o = el("option", null, pname(p)); o.value = p; sel.appendChild(o); }
     sel.value = memoUp.project || "";
     const inp = el("input", null); inp.type = "text"; inp.value = memoUp.text || "";
-    inp.setAttribute("aria-label", "덧붙일 칸"); inp.placeholder = "기준(선택). cycle, 한도 칸은 | 뒤에";
-    const ok = el("button", "tf-btn", "올리기"); ok.type = "submit"; ok.title = `jipsa todo up ${m.label} <프로젝트> | <기준>`;
-    const no = tfButton("취소", "할 일로 줄을 닫는다", () => { memoUp = null; memoSig = ""; drawMemo(state.data && state.data.todofile); });
+    inp.setAttribute("aria-label", T("덧붙일 칸")); inp.placeholder = T("기준(선택). cycle, 한도 칸은 | 뒤에");
+    const ok = el("button", "tf-btn", T("올리기")); ok.type = "submit"; ok.title = T("jipsa todo up {l} <프로젝트> | <기준>", { l: m.label });
+    const no = tfButton(T("취소"), T("할 일로 줄을 닫는다"), () => { memoUp = null; memoSig = ""; drawMemo(state.data && state.data.todofile); });
     sel.addEventListener("change", () => { memoUp.project = sel.value; });
     inp.addEventListener("input", () => { memoUp.text = inp.value; });
     form.addEventListener("submit", (ev) => {
@@ -1308,21 +1310,21 @@
     if (sig === memoSig) return; // 주기 새로 그리기가 열린 할 일로 줄과 입력 중인 값을 지우지 않게 바뀔 때만 다시 그린다
     memoSig = sig;
     if (memoUp && !rows.some((m) => m.key === memoUp.key)) memoUp = null;
-    $("memoN").textContent = `${rows.length}건`;
+    $("memoN").textContent = T("{n}건", { n: rows.length });
     const host = $("memoList"); host.textContent = "";
-    if (!rows.length) { host.appendChild(el("p", "tf-empty", "메모가 없다. 위 넣기 칸으로 넣는다")); return; }
+    if (!rows.length) { host.appendChild(el("p", "tf-empty", T("메모가 없다. 위 넣기 칸으로 넣는다"))); return; }
     for (const m of rows) {
       const row = el("div", `tf-row memo${memoUp && memoUp.key === m.key ? " open" : ""}`);
       row.appendChild(el("span", "no", m.label));
       const main = el("div", "main"); main.appendChild(el("div", "text", m.text)); row.appendChild(main);
       const bs = el("div", "btns");
-      bs.appendChild(tfButton("할 일로", `프로젝트와 기준을 붙여 할 일 칸으로 옮긴다 (jipsa todo up ${m.label})`, () => {
+      bs.appendChild(tfButton(T("할 일로"), T("프로젝트와 기준을 붙여 할 일 칸으로 옮긴다 (jipsa todo up {l})", { l: m.label }), () => {
         memoUp = memoUp && memoUp.key === m.key ? null : { key: m.key, project: "", text: "" };
         memoSig = ""; drawMemo(state.data && state.data.todofile);
       }));
-      bs.appendChild(tfMore(m.key, [tfButton("지우기", `메모를 지운다 (jipsa todo memo-rm ${m.label})`, () => {
+      bs.appendChild(tfMore(m.key, [tfButton(T("지우기"), T("메모를 지운다 (jipsa todo memo-rm {l})", { l: m.label }), () => {
         closeTfMenu();
-        if (!window.confirm(`이 메모를 지운다.\n\n${m.text}`)) return;
+        if (!window.confirm(T("이 메모를 지운다.\n\n{t}", { t: m.text }))) return;
         tfRun({ name: "todo memo-rm", key: m.key }, "memoPanel");
       }, true)]));
       row.appendChild(bs); host.appendChild(row);
@@ -1342,7 +1344,7 @@
     a.hidden = !url; off.hidden = true; a.href = url || "#"; a.onclick = null; a.title = "";
     if (!url) return;
     if (url.startsWith("file:")) { // 브라우저가 http 페이지에서 file 주소를 막으므로 주소를 복사해 알린다
-      a.onclick = (ev) => { ev.preventDefault(); try { navigator.clipboard.writeText(url); } catch (e) { /* 복사 실패는 안내만 한다 */ } a.title = "file 주소를 복사했다. 브라우저 주소창에 붙여 넣는다"; };
+      a.onclick = (ev) => { ev.preventDefault(); try { navigator.clipboard.writeText(url); } catch (e) { /* 복사 실패는 안내만 한다 */ } a.title = T("file 주소를 복사했다. 브라우저 주소창에 붙여 넣는다"); };
       return;
     }
     try { const r = await fetch(`/api/preview?url=${encodeURIComponent(url)}`); const d = await r.json(); if (a.getAttribute("href") === url) off.hidden = d.up !== false; }
@@ -1353,10 +1355,10 @@
   function setDraft(m) {
     const d = $("drDraft"), off = $("drPreviewOff");
     d.hidden = !m.draft;
-    if (m.draft && !m.preview_url) { off.textContent = "초안 주소 없음"; off.title = "초안 실행인데 결과 파일의 미리보기 주소가 비어 초안 보기 단추가 뜨지 않는다"; off.hidden = false; }
-    else { off.textContent = "미리보기 꺼짐"; off.title = ""; }
+    if (m.draft && !m.preview_url) { off.textContent = T("초안 주소 없음"); off.title = T("초안 실행인데 결과 파일의 미리보기 주소가 비어 초안 보기 단추가 뜨지 않는다"); off.hidden = false; }
+    else { off.textContent = T("미리보기 꺼짐"); off.title = ""; }
   }
-  const draftTag = (r) => el("span", `tag draft${r.preview ? "" : " miss"}`, r.preview ? "초안" : "초안, 주소 없음"); // 목록 줄의 초안 표식
+  const draftTag = (r) => el("span", `tag draft${r.preview ? "" : " miss"}`, r.preview ? T("초안") : T("초안, 주소 없음")); // 목록 줄의 초안 표식
 
   // 서랍 머리의 지시 글은 세 줄을 넘으면 접고 [전체 보기]를 둔다. 펼친 상태는 같은 실행을 주기로 다시 받을 때만 이어 간다
   function fitName(runId) {
@@ -1364,7 +1366,7 @@
     n.classList.remove("open"); n.classList.add("clamp");
     const long = n.scrollHeight > n.clientHeight + 1;
     n.classList.toggle("clamp", !(long && open)); n.classList.toggle("open", long && open);
-    b.hidden = !long; b.textContent = open ? "접기" : "전체 보기"; b.setAttribute("aria-expanded", long && open ? "true" : "false");
+    b.hidden = !long; b.textContent = open ? T("접기") : T("전체 보기"); b.setAttribute("aria-expanded", long && open ? "true" : "false");
   }
   $("drNameMore").addEventListener("click", () => { state.nameOpen = state.nameOpen === state.open ? "" : state.open; fitName(state.open); });
   window.addEventListener("resize", () => { if (!$("drawer").hidden) fitName(state.open); }); // 폭이 바뀌면 줄 수도 바뀐다
@@ -1375,7 +1377,7 @@
     state.open = runId;
     $("drawer").hidden = false; $("scrim").hidden = false;
     if (!quiet) {
-      state.nameOpen = ""; $("drName").textContent = runId; fitName(""); $("drMeta").textContent = ""; $("drStatus").textContent = ""; $("drBody").textContent = "불러오는 중";
+      state.nameOpen = ""; $("drName").textContent = runId; fitName(""); $("drMeta").textContent = ""; $("drStatus").textContent = ""; $("drBody").textContent = T("불러오는 중");
       $("drAnswer").hidden = true; $("drFoot").hidden = true; $("drRawLine").hidden = true; setPreview("");
     }
     const scrollTop = $("drScroll").scrollTop;
@@ -1386,7 +1388,7 @@
       const m = d.meta;
       $("drName").textContent = runName(m); fitName(runId);
       drawHeadStatus(runId, m, d.shown);
-      $("drMeta").textContent = `${m.run_id}  ${EXECUTOR[m.executor] || ""}  ${dur(m.minutes_used, m.minutes_limit)}${budgetText(m) ? `  (${budgetText(m)})` : ""}`;
+      $("drMeta").textContent = `${m.run_id}  ${T(EXECUTOR[m.executor] || "")}  ${dur(m.minutes_used, m.minutes_limit)}${budgetText(m) ? `  (${budgetText(m)})` : ""}`;
       $("drRaw").href = `/api/sheet?id=${encodeURIComponent(runId)}`; $("drRawLine").hidden = false; // 원문 링크는 본문 끝 열어 볼 파일 옆이다(42 초안 우선순위 16)
       setPreview(m.preview_url || ""); setDraft(m);
       renderMd(d.sheet || "", $("drBody"), d.base || "");
@@ -1401,10 +1403,10 @@
         // 확인하지 않은 완료와 실패도 확인 필요다. 답을 넣으면 확인되어 완료가 된다(261023-jipsa-26)
         const plain = m.status !== "확인 필요" && !(d.choices || []).length && !(d.notes || []).length; // 고를 것 없는 확인 필요 결과
         const unseen = m.status !== "확인 필요" && ackState(runId, m.status, m.finished) === "cue";
-        $("drAnswer").querySelector(".t").textContent = m.status === "확인 필요" ? "확인 필요, 답을 넣을 것. 선택지를 누르거나 직접 적는다."
-          : plain ? `확인 필요 결과다. 확인이라고 넣거나 덧붙일 지시를 적으면 확인되어 완료가 된다. 지시는 세션에 넘어가고 다시 돌리지 않는다.`
-          : unseen ? `확인 필요 결과다. ${(d.choices || []).length ? "안을 누르거나 " : ""}직접 적어 넣으면 확인되어 완료가 된다. 답은 세션에 넘어가고 다시 돌리지 않는다.${m.options_auto && (d.choices || []).length ? " 안은 보고서 정할 것에서 자동으로 뽑았다." : ""}`
-          : `고를 것이 남은 ${stName(m.status)} 결과다. ${(d.choices || []).length ? "안을 누르거나 " : ""}직접 적는다. 답은 세션에 넘어가고 다시 돌리지 않는다.${m.options_auto && (d.choices || []).length ? " 안은 보고서 정할 것에서 자동으로 뽑았다." : ""}`;
+        $("drAnswer").querySelector(".t").textContent = m.status === "확인 필요" ? T("확인 필요, 답을 넣을 것. 선택지를 누르거나 직접 적는다.")
+          : plain ? T("확인 필요 결과다. 확인이라고 넣거나 덧붙일 지시를 적으면 확인되어 완료가 된다. 지시는 세션에 넘어가고 다시 돌리지 않는다.")
+          : unseen ? T("확인 필요 결과다. {c}직접 적어 넣으면 확인되어 완료가 된다. 답은 세션에 넘어가고 다시 돌리지 않는다.{a}", { c: (d.choices || []).length ? T("안을 누르거나 ") : "", a: m.options_auto && (d.choices || []).length ? T(" 안은 보고서 정할 것에서 자동으로 뽑았다.") : "" })
+          : T("고를 것이 남은 {s} 결과다. {c}직접 적는다. 답은 세션에 넘어가고 다시 돌리지 않는다.{a}", { s: stName(m.status), c: (d.choices || []).length ? T("안을 누르거나 ") : "", a: m.options_auto && (d.choices || []).length ? T(" 안은 보고서 정할 것에서 자동으로 뽑았다.") : "" });
         // 단추는 고를 안(1안, 2안)에만 짧게 두고 안 내용은 옆에 글자로 보인다. 누르면 답 칸에 안 이름이 채워지고 뒤에 추가 지시를 이어 쓸 수 있다
         // 안 이름이 숫자 묶음(1안, 2안)과 가나다 묶음(가안, 나안)처럼 둘 이상이면 묶음마다 단추 한 줄을 두고 묶음마다 하나씩 골라 "1안, 나안"으로 잇는다
         const cs = d.choices || [], groups = [...new Set(cs.map((c) => c.group || ""))], multi = groups.length > 1;
@@ -1412,8 +1414,8 @@
         const btns = [];
         const mark = () => { const got = answerPicks($("drInput").value, cs).picks; for (const [b, c] of btns) { const on = got.get(c.group || "") === c.name; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on ? "true" : "false"); } };
         const button = (c, rec) => {
-          const b = el("button", null, rec ? `${c.name} (추천)` : c.name); b.type = "button"; btns.push([b, c]);
-          b.addEventListener("click", () => { const inp = $("drInput"); inp.value = pickAnswer(inp.value, cs, c); mark(); $("drAnswerNote").textContent = "뒤에 쉼표와 추가 지시를 이어 써도 된다. 답 넣기를 누르면 확정된다"; fitAnswer(); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }); // 한 번 눌러서는 확정되지 않는다
+          const b = el("button", null, rec ? T("{n} (추천)", { n: c.name }) : c.name); b.type = "button"; btns.push([b, c]);
+          b.addEventListener("click", () => { const inp = $("drInput"); inp.value = pickAnswer(inp.value, cs, c); mark(); $("drAnswerNote").textContent = T("뒤에 쉼표와 추가 지시를 이어 써도 된다. 답 넣기를 누르면 확정된다"); fitAnswer(); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }); // 한 번 눌러서는 확정되지 않는다
           return b;
         };
         if (!multi) cs.forEach((c, i) => { opts.appendChild(button(c, i === 0 && c.text.includes("추천"))); opts.appendChild(el("span", "alt-text", c.text)); });
@@ -1426,12 +1428,12 @@
         for (const id of ["drNotes", "drNotesToggle"]) { const old = $(id); if (old) old.remove(); }
         if ((d.notes || []).length) { // 고를 안이 아닌 정할 것과 남은 일은 단추 없이 글자로만 보인다. 보고서 끝 절과 같은 글이라 기본은 개수 한 줄로 접는다
           // 펼치기 단추는 칸을 스크롤해도 늘 보이는 답 넣기 줄에 두고, 목록은 안 단추 아래에 펼친다
-          const label = `${cs.length ? "그 밖의 정할 것" : "정할 것"} ${d.notes.length}개`;
+          const label = T("{k} {n}개", { k: cs.length ? T("그 밖의 정할 것") : T("정할 것"), n: d.notes.length });
           const box = el("div", "notes"); box.id = "drNotes";
-          box.appendChild(el("div", "notes-t", `${cs.length ? "그 밖의 정할 것" : "정할 것"} (답 칸에 직접 적는다)`));
+          box.appendChild(el("div", "notes-t", T("{k} (답 칸에 직접 적는다)", { k: cs.length ? T("그 밖의 정할 것") : T("정할 것") })));
           const ul = el("ul"); for (const t of d.notes) ul.appendChild(el("li", null, t)); box.appendChild(ul);
           const tog = el("button", "notes-toggle"); tog.type = "button"; tog.id = "drNotesToggle"; tog.setAttribute("aria-controls", "drNotes");
-          const show = (open) => { box.hidden = !open; tog.setAttribute("aria-expanded", open ? "true" : "false"); tog.textContent = `${label} ${open ? "접기" : "펼치기"}`; };
+          const show = (open) => { box.hidden = !open; tog.setAttribute("aria-expanded", open ? "true" : "false"); tog.textContent = `${label} ${open ? T("접기") : T("펼치기")}`; };
           tog.addEventListener("click", () => {
             const open = box.hidden; setNotesOpen(open); show(open);
             if (open) { const a = $("drAnswer"); a.scrollTop = box.offsetTop - a.offsetTop - 8; } // 펼친 목록이 답 상자 뒤에 숨지 않게 칸 위쪽으로 올린다
@@ -1442,16 +1444,13 @@
         }
         $("drForm").onsubmit = (ev) => {
           ev.preventDefault();
-          if (pasted.busy) { $("drAnswerNote").textContent = "그림을 올리는 중이다. 다 올라간 뒤 넣는다"; return; } // 올리기 전에 넣으면 그 그림의 경로 줄이 답에서 빠진다
+          if (pasted.busy) { $("drAnswerNote").textContent = T("그림을 올리는 중이다. 다 올라간 뒤 넣는다"); return; } // 올리기 전에 넣으면 그 그림의 경로 줄이 답에서 빠진다
           const v = $("drInput").value.trim(), ims = keptImages(v);
-          if (v && window.confirm(`이 답으로 확정한다:
-${v}${ims.length ? `
-
-붙인 그림 ${ims.length}장은 답 끝에 저장 경로 줄로 붙는다` : ""}`)) sendAnswer(runId, v, ims);
+          if (v && window.confirm(T("이 답으로 확정한다:\n{v}{i}", { v, i: ims.length ? T("\n\n붙인 그림 {n}장은 답 끝에 저장 경로 줄로 붙는다", { n: ims.length }) : "" }))) sendAnswer(runId, v, ims);
         };
       }
       if (m.status === "진행 중") state.drawerTimer = setTimeout(() => { if (state.open === runId) openResult(runId, true); }, 10000);
-    } catch (e) { $("drBody").textContent = "결과지를 불러오지 못했다"; }
+    } catch (e) { $("drBody").textContent = T("결과지를 불러오지 못했다"); }
   }
   // 답 머리의 안 이름을 묶음별로 읽는다. 안 이름이 아닌 낱말이 나오면 그 뒤는 추가 지시다
   // 서버의 고른 안 판정과 같은 규칙이다. "(추천)"은 건너뛰고 "2안으로"처럼 조사가 붙은 이름도 안 이름으로 읽는다
@@ -1488,7 +1487,7 @@ ${v}${ims.length ? `
     const room = window.innerHeight * 0.3 - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom) - (row ? row.offsetHeight + 6 : 0) - (title ? title.offsetHeight + 6 : 0) - lh * 3;
     const min = lh * 3 + pad, max = Math.max(min, Math.min(lh * 12 + pad, room));
     t.style.height = `${Math.min(Math.max(t.scrollHeight, min), max)}px`;
-    $("drCount").textContent = `${t.value.length.toLocaleString()}자`;
+    $("drCount").textContent = T("{n}자", { n: t.value.length.toLocaleString() });
   }
   function wireAnswerBox() {
     const t = $("drInput");
@@ -1511,9 +1510,9 @@ ${v}${ims.length ? `
   function drawImages() {
     const box = $("drImages"); box.textContent = ""; box.hidden = !pasted.list.length;
     for (const p of pasted.list) {
-      const item = el("div", "pasted"), a = el("a"), img = el("img"), rm = el("button", null, "지우기");
-      a.href = p.url; a.target = "_blank"; a.rel = "noopener"; a.title = "새 탭에서 크게 본다"; img.src = p.url; img.alt = imageTag(p.n); a.appendChild(img);
-      rm.type = "button"; rm.setAttribute("aria-label", `${imageTag(p.n)} 지우기`);
+      const item = el("div", "pasted"), a = el("a"), img = el("img"), rm = el("button", null, T("지우기"));
+      a.href = p.url; a.target = "_blank"; a.rel = "noopener"; a.title = T("새 탭에서 크게 본다"); img.src = p.url; img.alt = imageTag(p.n); a.appendChild(img);
+      rm.type = "button"; rm.setAttribute("aria-label", T("{n} 지우기", { n: imageTag(p.n) }));
       rm.addEventListener("click", () => { // 칸의 표시 글자와 그림을 같이 지운다
         const t = $("drInput"); t.value = t.value.split(`${imageTag(p.n)} `).join("").split(imageTag(p.n)).join(""); // 붙일 때 넣은 표시 글자와 뒤 공백 하나만 지우고 나머지 글은 그대로 둔다
         pasted.list = pasted.list.filter((x) => x !== p); drawImages(); fitAnswer(); t.dispatchEvent(new Event("input")); t.focus();
@@ -1528,24 +1527,24 @@ ${v}${ims.length ? `
   // 그림 하나를 확인하고 올린 뒤 커서 자리에 표시 글자를 넣는다. 서버는 머리 서명만 보므로 브라우저가 먼저 그림으로 해독해 보고 실패하면 올리지 않는다
   async function attachImage(blob) {
     const note = $("drAnswerNote"), runId = state.open;
-    if (!IMAGE_TYPES.includes(blob.type)) { note.textContent = `${blob.type || "알 수 없는 형식"}은 붙이지 않는다. PNG, JPEG, GIF, WebP만 받는다`; return false; }
-    if (blob.size > IMAGE_MAX) { note.textContent = `그림이 ${(blob.size / 1048576).toFixed(1)}MB다. 10MB 이하만 붙인다`; return false; }
+    if (!IMAGE_TYPES.includes(blob.type)) { note.textContent = T("{t}은 붙이지 않는다. PNG, JPEG, GIF, WebP만 받는다", { t: blob.type || T("알 수 없는 형식") }); return false; }
+    if (blob.size > IMAGE_MAX) { note.textContent = T("그림이 {n}MB다. 10MB 이하만 붙인다", { n: (blob.size / 1048576).toFixed(1) }); return false; }
     try { const bm = await createImageBitmap(blob); bm.close(); }
-    catch (e) { note.textContent = "그림으로 읽히지 않아 올리지 않았다"; return false; }
+    catch (e) { note.textContent = T("그림으로 읽히지 않아 올리지 않았다"); return false; }
     const t = $("drInput"), at = [t.selectionStart, t.selectionEnd];
-    pasted.busy += 1; note.textContent = "그림을 올리는 중";
+    pasted.busy += 1; note.textContent = T("그림을 올리는 중");
     try {
       const r = await fetch(`/api/answer_image?run=${encodeURIComponent(runId)}`, { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
       const d = await r.json();
-      if (!d.ok) { note.textContent = `그림을 올리지 못했다: ${d.why || ""}`; return false; }
+      if (!d.ok) { note.textContent = T("그림을 올리지 못했다: {w}", { w: d.why || "" }); return false; }
       if (state.open !== runId) return false; // 올리는 사이 다른 결과지를 열었다
       const n = pasted.next++; pasted.list.push({ n, name: d.name, url: d.url });
       const before = t.value.slice(0, at[0]), pad = before && !/\s$/.test(before) ? " " : "";
       t.setRangeText(`${pad}${imageTag(n)} `, at[0], at[1], "end");
       drawImages(); fitAnswer(); t.dispatchEvent(new Event("input")); t.focus();
-      note.textContent = `${imageTag(n)}를 붙였다. 답을 넣으면 저장 경로가 답 끝에 붙는다`;
+      note.textContent = T("{n}를 붙였다. 답을 넣으면 저장 경로가 답 끝에 붙는다", { n: imageTag(n) });
       return true;
-    } catch (e) { note.textContent = "그림을 올리지 못했다: 서버에 닿지 않는다"; return false; }
+    } catch (e) { note.textContent = T("그림을 올리지 못했다: 서버에 닿지 않는다"); return false; }
     finally { pasted.busy -= 1; }
   }
   function wireImagePaste() {
@@ -1561,23 +1560,23 @@ ${v}${ims.length ? `
       if (!ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey || !["KeyV", "KeyC"].includes(ev.code)) return;
       ev.preventDefault();
       const note = $("drAnswerNote");
-      if (!navigator.clipboard?.read) { note.textContent = "이 브라우저는 클립보드 읽기를 지원하지 않는다. Ctrl+V로 붙인다"; return; }
+      if (!navigator.clipboard?.read) { note.textContent = T("이 브라우저는 클립보드 읽기를 지원하지 않는다. Ctrl+V로 붙인다"); return; }
       let items;
       try { items = await navigator.clipboard.read(); }
-      catch (e) { note.textContent = "클립보드 읽기가 막혀 있다. 주소창 왼쪽의 사이트 설정에서 클립보드를 허용하거나 Ctrl+V로 붙인다"; return; }
+      catch (e) { note.textContent = T("클립보드 읽기가 막혀 있다. 주소창 왼쪽의 사이트 설정에서 클립보드를 허용하거나 Ctrl+V로 붙인다"); return; }
       const types = items.map((it) => [it, it.types.find((x) => x.startsWith("image/"))]).filter(([, type]) => type);
-      if (!types.length) { note.textContent = "클립보드에 그림이 없다"; return; }
+      if (!types.length) { note.textContent = T("클립보드에 그림이 없다"); return; }
       for (const [it, type] of types) await attachImage(await it.getType(type));
     });
   }
   wireImagePaste();
   async function sendAnswer(runId, text, images) {
-    const note = $("drAnswerNote"); note.textContent = "보내는 중";
+    const note = $("drAnswerNote"); note.textContent = T("보내는 중");
     try {
       const r = await fetch("/api/answer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runId, answer: text, images: images || [] }) });
       const d = await r.json();
       // 세션으로 가는 답은 어디로 가는지 같이 보인다. 2분 안에 세션이 받지 않으면 스케줄러 작업자로 넘어간다(261103-jipsa-08)
-      note.textContent = d.ok ? (d.resume ? "답을 넣었다. 스케줄러가 다음 주기에 이어 돌린다" : `답을 기록에 적었다. ${d.delivery || ""}`) : `넣지 못했다: ${d.why || ""}`;
+      note.textContent = d.ok ? (d.resume ? T("답을 넣었다. 스케줄러가 다음 주기에 이어 돌린다") : T("답을 기록에 적었다. {d}", { d: d.delivery || "" })) : T("넣지 못했다: {w}", { w: d.why || "" });
       if (!d.ok) return;
       // 답을 넣으면 서버가 확인을 같이 적는다. 상태 전체를 다시 받는 데 10초쯤 걸리므로 돌려받은 확인 기록으로 먼저 상단, 막대, 서랍 머리를 바꾸고
       // 다 받은 뒤 서랍을 한 번 더 그린다. 옛 서버는 확인 기록을 돌려주지 않으므로 다 받은 뒤에야 바뀐다(261022-jipsa-59)
@@ -1586,7 +1585,7 @@ ${v}${ims.length ? `
       if (state.open === runId) openResult(runId, true);
       await refreshNow();
       if (state.open === runId) openResult(runId, true);
-    } catch (e) { note.textContent = "서버에 닿지 않는다"; }
+    } catch (e) { note.textContent = T("서버에 닿지 않는다"); }
   }
   // 이미 답이 들어간 결과지 맨 위의 표시. 물리기는 세션에서 jipsa answer --undo로 한다
   function drawAnswered(runId, a) {
@@ -1594,7 +1593,7 @@ ${v}${ims.length ? `
     const box = el("div", "confirm done"); box.id = "drAnswered";
     const urls = new Map((a.images || []).map((x) => [`[Image #${x.n}]`, x])), memo = el("div", "memo");
     const shown = urls.size ? a.answer.split("\n").filter((l) => !/^\[Image #\d+\] \S/.test(l.trim()) || !urls.has(l.trim().split("] ")[0] + "]")).join("\n").trim() : a.answer;
-    memo.append(`넣은 답${a.answered_at ? ` (${mdhm(parse(a.answered_at))})` : ""}: `);
+    memo.append(T("넣은 답{t}: ", { t: a.answered_at ? ` (${mdhm(parse(a.answered_at))})` : "" }));
     for (const part of shown.split(/(\[Image #\d+\])/)) { // 표시 글자는 그림을 여는 링크다. 경로는 마우스를 올리면 보인다
       const x = urls.get(part);
       if (!x) { memo.append(part); continue; }
@@ -1604,10 +1603,10 @@ ${v}${ims.length ? `
     // 그 답이 지금 어디에 있는지. 서버 기록에서 읽어 새로 고쳐도 같다. 아무도 받지 않은 답은 처리된 것처럼 읽히지 않게 강조한다(261103-jipsa-08)
     if (a.route) {
       const line = el("div", a.route.done ? "muted" : "route-open", a.route.text);
-      if (a.route.run) { const go = el("a", "", " 결과지 열기"); go.href = "#"; go.addEventListener("click", (e) => { e.preventDefault(); openResult(a.route.run); }); line.appendChild(go); }
+      if (a.route.run) { const go = el("a", "", T(" 결과지 열기")); go.href = "#"; go.addEventListener("click", (e) => { e.preventDefault(); openResult(a.route.run); }); line.appendChild(go); }
       box.appendChild(line);
     }
-    box.appendChild(el("span", "muted", `잘못 넣었으면 세션에서 jipsa answer ${runId} --undo로 물린다`));
+    box.appendChild(el("span", "muted", T("잘못 넣었으면 세션에서 jipsa answer {id} --undo로 물린다", { id: runId })));
     $("drBody").prepend(box);
   }
   // 서랍 머리 배지도 타임라인 막대와 같은 판정이다. 서버가 준 판정(confirm.shown)이 먼저고 없으면 화면의 같은 규칙(shownOf)이다.
@@ -1615,8 +1614,8 @@ ${v}${ims.length ? `
   function drawHeadStatus(runId, meta, shown) {
     const st = $("drStatus"); let cls = (meta.status || "").replace(" ", ""), text = stName(meta.status) || ""; // 모양은 상태 표기 한 벌의 CSS가 그린다(8안)
     const s = state.view === "live" && shown ? shown : shownOf(runId, meta.status, meta.finished);
-    if (s === "확인 필요" && meta.status !== "확인 필요") { cls = "확인필요"; text = meta.status === "실패" ? "확인 필요(실패)" : "확인 필요"; }
-    else if (s === "확인함") { cls = "완료"; text = "확인함"; }
+    if (s === "확인 필요" && meta.status !== "확인 필요") { cls = "확인필요"; text = meta.status === "실패" ? T("확인 필요(실패)") : T("확인 필요"); }
+    else if (s === "확인함") { cls = "완료"; text = T("확인함"); }
     st.className = `stpill ${cls}`; st.textContent = text;
   }
   // 결과지 맨 아래의 확인 단추. 진행 중과 세션 기록에는 두지 않는다
@@ -1632,30 +1631,30 @@ ${v}${ims.length ? `
     foot.hidden = false; foot.className = `drawer-foot${done ? " done" : ""}`; // 바닥 고정 줄(42 초안 구역 17). 본문이 길어도 첫 화면에 보인다
     const btn = (text, cls, fn) => { const b = el("button", cls, text); b.type = "button"; b.addEventListener("click", fn); return b; };
     const row = el("div", "row"), note = el("span", "muted");
-    if (meta.confirmed_from) box.appendChild(el("div", "memo", `${meta.confirmed_from}였으나 확인해 완료로 처리 (${mdhm(parse(meta.confirmed_at))})`)); // 원래 사유는 결과지에 그대로 있다
-    if (hold && done) box.appendChild(el("div", "memo", "답 없이 확인함. 상태 값과 큐 보류는 그대로라 다시 돌지 않는다. 되돌리면 답 칸이 다시 열린다")); // 머리 배지도 확인함이다(261025-jipsa-04)
-    if (done) row.appendChild(btn("확인 필요로 되돌리기", "small", () => sendConfirm(runId, "reset", "", note)));
+    if (meta.confirmed_from) box.appendChild(el("div", "memo", T("{s}였으나 확인해 완료로 처리 ({t})", { s: stName(meta.confirmed_from), t: mdhm(parse(meta.confirmed_at)) }))); // 원래 사유는 결과지에 그대로 있다
+    if (hold && done) box.appendChild(el("div", "memo", T("답 없이 확인함. 상태 값과 큐 보류는 그대로라 다시 돌지 않는다. 되돌리면 답 칸이 다시 열린다"))); // 머리 배지도 확인함이다(261025-jipsa-04)
+    if (done) row.appendChild(btn(T("확인 필요로 되돌리기"), "small", () => sendConfirm(runId, "reset", "", note)));
     else {
-      row.appendChild(btn(hold ? "답 없이 확인" : "확인", "primary", () => {
+      row.appendChild(btn(hold ? T("답 없이 확인") : T("확인"), "primary", () => {
         // 끝난 실행의 확인은 답 칸에 글이 있으면 확인만 적어 글을 버리지 않고 답 넣기와 같은 확정 창을 거쳐 답으로 넣는다. 답이 들어가면 서버가 확인도 같이 적는다(261029-jipsa-45)
         // 상태 값 확인 필요의 "답 없이 확인"은 이름대로 답 없이 확인한다
         if (!hold && !$("drAnswer").hidden && $("drInput").value.trim()) { $("drForm").requestSubmit(); return; }
         sendConfirm(runId, "ack", "", note);
       }));
-      if (hold) note.textContent = "확인하면 답 칸이 닫히고 확인 필요에서 빠진다. 상태와 큐 보류는 그대로라 다시 돌지 않는다";
+      if (hold) note.textContent = T("확인하면 답 칸이 닫히고 확인 필요에서 빠진다. 상태와 큐 보류는 그대로라 다시 돌지 않는다");
     }
     box.appendChild(row); box.appendChild(note); foot.appendChild(box);
   }
   async function sendConfirm(runId, action, memo, note) {
-    note.textContent = "보내는 중";
+    note.textContent = T("보내는 중");
     try {
       const r = await fetch("/api/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runId, action, memo }) });
       const d = await r.json();
-      if (!d.ok) { note.textContent = `적지 못했다: ${d.why || ""}`; return; }
+      if (!d.ok) { note.textContent = T("적지 못했다: {w}", { w: d.why || "" }); return; }
       state.data.confirm = d.confirm; render();
       if (state.open === runId) openResult(runId, true);
       refreshNow(); // 실패가 완료로 바뀌거나 돌아오므로 실행 상태를 서버에서 다시 받는다
-    } catch (e) { note.textContent = "서버에 닿지 않는다. 대시보드 서버를 다시 켜야 할 수 있다"; }
+    } catch (e) { note.textContent = T("서버에 닿지 않는다. 대시보드 서버를 다시 켜야 할 수 있다"); }
   }
   function closeResult() { state.open = null; $("drawer").hidden = true; $("scrim").hidden = true; clearTimeout(state.drawerTimer); }
   $("drClose").addEventListener("click", closeResult); $("scrim").addEventListener("click", closeResult);
@@ -1666,10 +1665,10 @@ ${v}${ims.length ? `
     const d0 = new Date(); const date = state.view === "live" ? `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, "0")}-${String(d0.getDate()).padStart(2, "0")}` : (state.data?.date || "");
     state.open = `report:${date}`;
     $("drawer").hidden = false; $("scrim").hidden = false; $("drAnswer").hidden = true; $("drFoot").hidden = true; $("drFoot").textContent = "";
-    $("drName").textContent = `보고 ${date}`; fitName(""); $("drStatus").textContent = ""; $("drStatus").className = "stpill"; $("drMeta").textContent = ""; $("drBody").textContent = "불러오는 중";
+    $("drName").textContent = T("보고 {d}", { d: date }); fitName(""); $("drStatus").textContent = ""; $("drStatus").className = "stpill"; $("drMeta").textContent = ""; $("drBody").textContent = T("불러오는 중");
     $("drRaw").href = `/api/report?date=${encodeURIComponent(date)}`; $("drRawLine").hidden = false; setPreview("");
     try { const r = await fetch(`/api/report?date=${encodeURIComponent(date)}`); const d = await r.json(); renderMd(d.text || "", $("drBody")); foldReport($("drBody")); }
-    catch (e) { $("drBody").textContent = "보고를 불러오지 못했다"; }
+    catch (e) { $("drBody").textContent = T("보고를 불러오지 못했다"); }
   }
   // 하루 보고의 항목 줄(프로젝트 | 지시 | 결과 | 커밋이나 바뀐 파일 | 분)은 프로젝트, 결과, 분만 보이고 지시문 전문과 아래 분석, 주체, 토큰 줄은 자세히로 접는다(42 초안 우선순위 6)
   function foldReport(host) {
@@ -1682,8 +1681,8 @@ ${v}${ims.length ? `
       const mn = tail.length && /^\d+분$/.test(tail[tail.length - 1]) ? tail.pop() : "";
       li.textContent = ""; li.className = "day";
       const l1 = el("div", "l1"); l1.appendChild(el("span", "pj", pname(pj))); l1.appendChild(el("span", "rs", result)); if (mn) l1.appendChild(el("span", "mn", mn)); li.appendChild(l1);
-      const det = el("details"); det.appendChild(el("summary", null, "자세히"));
-      det.appendChild(el("p", null, `지시: ${title}`)); if (tail.length) det.appendChild(el("p", null, tail.join(", ")));
+      const det = el("details"); det.appendChild(el("summary", null, T("자세히")));
+      det.appendChild(el("p", null, T("지시: {t}", { t: title }))); if (tail.length) det.appendChild(el("p", null, tail.join(", ")));
       if (sub) det.appendChild(sub);
       li.appendChild(det);
     }
@@ -1695,11 +1694,11 @@ ${v}${ims.length ? `
   // 마감 전 Sol 공격 요약(meta.attack). 툴팁은 전체, 막대 위 표시는 '공격 3, 반영 2, 사람 1'이다(261024-jipsa-11)
   function atkShort(r) {
     const a = r && r.attack; if (!a) return "";
-    return a.state === "있음" ? `공격 ${a.n}, 반영 ${a.applied}, 사람 ${a.human}` : "공격 없음";
+    return a.state === "있음" ? T("공격 {n}, 반영 {a}, 사람 {h}", { n: a.n, a: a.applied, h: a.human }) : T("공격 없음");
   }
   function atkText(r) {
     const a = r && r.attack; if (!a) return "";
-    return a.state === "있음" ? `판정 ${a.verdict}, ${atkShort(r)}${a.rebut ? `, 반박 ${a.rebut}` : ""}${a.unanswered ? `, 답 없음 ${a.unanswered}` : ""}` : `공격 없음(${a.why || "사유 없음"})`;
+    return a.state === "있음" ? T("판정 {v}, {s}", { v: a.verdict, s: atkShort(r) }) + (a.rebut ? T(", 반박 {n}", { n: a.rebut }) : "") + (a.unanswered ? T(", 답 없음 {n}", { n: a.unanswered }) : "") : T("공격 없음({w})", { w: a.why || T("사유 없음") });
   }
   // ----- 작은 마크다운 그리기. 글자는 모두 textContent로 넣는다 -----
   function renderMd(text, host, base) {
@@ -1716,7 +1715,7 @@ ${v}${ims.length ? `
         const buf = []; let sum = ""; i++;
         while (i < lines.length && !/^<\/details>\s*$/.test(lines[i])) { const s = /^<summary>(.*)<\/summary>\s*$/.exec(lines[i]); if (s && !sum) sum = s[1]; else buf.push(lines[i]); i++; }
         i++;
-        const d = el("details", "fold"); d.appendChild(el("summary", null, sum || "펼치기")); const inner = el("div"); renderMd(buf.join("\n"), inner, base); d.appendChild(inner); host.appendChild(d); continue;
+        const d = el("details", "fold"); d.appendChild(el("summary", null, sum || T("펼치기"))); const inner = el("div"); renderMd(buf.join("\n"), inner, base); d.appendChild(inner); host.appendChild(d); continue;
       }
       if (/^```/.test(line)) {
         flushPara(); closeLists(0);
@@ -1725,7 +1724,7 @@ ${v}${ims.length ? `
         while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
         i++;
         if (["요약", "용어", "핵심"].includes(lang)) { // 보고서의 요약 상자
-          const box = el("aside", "box"); box.appendChild(el("div", "label", lang));
+          const box = el("aside", "box"); box.appendChild(el("div", "label", T(lang)));
           for (const l of buf) if (l.trim()) { const p = el("p"); inline(l, p); box.appendChild(p); }
           host.appendChild(box); continue;
         }
@@ -1735,7 +1734,7 @@ ${v}${ims.length ? `
       if (img) {
         flushPara(); closeLists(0);
         const fig = el("figure"); const im = el("img"); im.src = src(img[2]); im.alt = img[1]; im.loading = "lazy";
-        const link = el("a"); link.href = im.src; link.target = "_blank"; link.rel = "noopener"; link.title = "원본 크기로 열기"; link.appendChild(im); fig.appendChild(link); // 서랍이 좁아도 원본은 새 탭에서 본다
+        const link = el("a"); link.href = im.src; link.target = "_blank"; link.rel = "noopener"; link.title = T("원본 크기로 열기"); link.appendChild(im); fig.appendChild(link); // 서랍이 좁아도 원본은 새 탭에서 본다
         if (img[1]) fig.appendChild(el("figcaption", null, img[1]));
         host.appendChild(fig); i++; continue;
       }
@@ -1793,12 +1792,12 @@ ${v}${ims.length ? `
   const ago = (iso) => {
     const t = parse(iso); if (!t) return "";
     const m = Math.max(0, Math.round(((parse(state.data?.now) || new Date()) - t) / 60000));
-    return m < 60 ? `${m}분 전` : m < 1440 ? `${Math.floor(m / 60)}시간 전` : `${Math.floor(m / 1440)}일 전`;
+    return m < 60 ? T("{n}분 전", { n: m }) : m < 1440 ? T("{n}시간 전", { n: Math.floor(m / 60) }) : T("{n}일 전", { n: Math.floor(m / 1440) });
   };
   // 상태 기호: 모양과 색을 같이 쓴다. 진행 중 원, 확인 필요 마름모, 실패 네모, 쉬는 중 빈 원
   const stChip = (cls, text) => { const s = el("span", `st ${cls}`); s.appendChild(el("i")); s.appendChild(document.createTextNode(text)); return s; };
   const cueCls = (kind) => (kind === "실패" ? "fail" : "cue");
-  const cueAct = (kind) => (kind === "실패" ? "다시 보기" : kind === "답 대기" || kind === "종합 보고" ? "답 넣기" : "결과지");
+  const cueAct = (kind) => (kind === "실패" ? T("다시 보기") : kind === "답 대기" || kind === "종합 보고" ? T("답 넣기") : T("결과지"));
   const clickable = (node, fn) => {
     node.tabIndex = 0; node.setAttribute("role", "button");
     node.addEventListener("click", (ev) => { ev.stopPropagation(); fn(); });
@@ -1807,11 +1806,11 @@ ${v}${ims.length ? `
   };
   function boardSpark(c) {
     const W = 150, H = 44, P = 6;
-    const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: "pspark", role: "img", "aria-label": "Cycle별 다시 잰 값과 목표선" });
+    const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: "pspark", role: "img", "aria-label": T("Cycle별 다시 잰 값과 목표선") });
     // 시작값, Cycle별 다시 잰 값과 95% 구간, 목표선이다(6안). 채택은 채운 점, 버림은 속이 빈 점, 목표에 닿은 점은 초록이다
     const sp = scorePts(c);
     const pts = (sp.start != null ? [{ n: 0, s: sp.start, adopt: true, start: true }] : []).concat(sp.pts);
-    if (!pts.length) { const t = svgEl("text", { x: 2, y: H / 2 + 4, class: "lb" }); t.textContent = "지표 없음"; svg.appendChild(t); return svg; }
+    if (!pts.length) { const t = svgEl("text", { x: 2, y: H / 2 + 4, class: "lb" }); t.textContent = T("지표 없음"); svg.appendChild(t); return svg; }
     const vals = pts.flatMap((p) => [p.s, p.low, p.high]).concat(c.target != null ? [c.target] : []).filter((v) => v != null);
     const pad = Math.max(1, (Math.max(...vals) - Math.min(...vals)) * 0.08), lo = Math.min(...vals) - pad, hi = Math.max(...vals) + pad;
     const maxN = Math.max(1, ...pts.map((p) => p.n));
@@ -1821,7 +1820,7 @@ ${v}${ims.length ? `
     svg.appendChild(svgEl("path", { d: pts.map((p, i) => `${i ? "L" : "M"}${x(p.n).toFixed(1)},${y(p.s).toFixed(1)}`).join(" "), class: "ln" }));
     const hit = (v) => c.target != null && (c.direction === "이하" ? v <= c.target : v >= c.target);
     for (const p of pts) svg.appendChild(svgEl("circle", { cx: x(p.n).toFixed(1), cy: y(p.s).toFixed(1), r: 3, class: `pt${hit(p.s) ? " hit" : ""}${p.adopt ? "" : " drop"}` }));
-    svg.appendChild(svgEl("title", {})).textContent = pts.map((p) => `${p.n ? `Cycle ${p.n}` : "시작"} ${p.s}${p.low != null ? ` (${p.low}~${p.high})` : ""}${p.start ? "" : p.adopt ? " 채택" : " 버림"}`).join(", ") + (c.target != null ? `, 목표 ${c.target} ${c.direction}` : "");
+    svg.appendChild(svgEl("title", {})).textContent = pts.map((p) => `${p.n ? `Cycle ${p.n}` : T("시작")} ${p.s}${p.low != null ? ` (${p.low}~${p.high})` : ""}${p.start ? "" : p.adopt ? T(" 채택") : T(" 버림")}`).join(", ") + (c.target != null ? T(", 목표 {t} {d}", { t: c.target, d: T(c.direction) }) : "");
     return svg;
   }
   const cycLive = (c) => !!(c.cycle && c.cycle.status !== "끝"); // 현황판 카드의 Cycle 목표가 아직 도는지
@@ -1835,20 +1834,20 @@ ${v}${ims.length ? `
     const group = (r) => {
       const s = r.steps || {}, g = el("div", "sg");
       const h = el("div", "sh");
-      h.appendChild(stChip(r.stall_min > 0 ? "stop" : "run", r.stall_min > 0 ? "멈춤" : r.executor === "subagent" ? "서브에이전트" : "작업자"));
+      h.appendChild(stChip(r.stall_min > 0 ? "stop" : "run", r.stall_min > 0 ? T("멈춤") : r.executor === "subagent" ? T("서브에이전트") : T("작업자")));
       h.appendChild(el("span", "stt", r.title.length > 20 ? `${r.title.slice(0, 20)}…` : r.title));
-      g.title = `${r.title}${r.stall_min > 0 ? ` (멈춤 ${r.stall_min}분)` : ""}`;
+      g.title = `${r.title}${r.stall_min > 0 ? T(" (멈춤 {n}분)", { n: r.stall_min }) : ""}`;
       g.appendChild(h);
       const ul = el("ul", "pl");
       const line = (cls, st) => {
         if (!st) return;
         const li = el("li", cls); li.appendChild(el("i", "dot"));
-        li.appendChild(el("span", "tt", st.name)); li.title = `${st.no}단계 ${st.name}`; ul.appendChild(li);
+        li.appendChild(el("span", "tt", st.name)); li.title = T("{n}단계 {s}", { n: st.no, s: st.name }); ul.appendChild(li);
       };
       line("done", s.done);
       line("now", s.now);
       line("next", s.next);
-      if (!ul.children.length) ul.appendChild(el("li", "none", "단계 기록 아직 없음"));
+      if (!ul.children.length) ul.appendChild(el("li", "none", T("단계 기록 아직 없음")));
       g.appendChild(ul);
       return g;
     };
@@ -1868,18 +1867,18 @@ ${v}${ims.length ? `
     const n = cues.length, run = c.running.length;
     const card = el("article", `pc${n ? " cue" : run ? " run" : ""}`);
     const head = el("div", "ph"); head.appendChild(el("span", "pn", pname(c.name)));
-    head.appendChild(n ? stChip("cue", `확인 필요 ${n}`) : c.running.some((r) => r.stall_min > 0) ? stChip("stop", "멈춤") : run ? stChip("run", "진행 중") : cycLive(c) ? stChip("run", "목표 진행") : (c.recent || []).length ? ((c.recent || []).every((r) => r.status === "실패") ? stChip("fail", "최근 실패") : stChip("done", "최근 완료")) : stChip("todo", "쉬는 중"));
+    head.appendChild(n ? stChip("cue", T("확인 필요 {n}", { n })) : c.running.some((r) => r.stall_min > 0) ? stChip("stop", T("멈춤")) : run ? stChip("run", T("진행 중")) : cycLive(c) ? stChip("run", T("목표 진행")) : (c.recent || []).length ? ((c.recent || []).every((r) => r.status === "실패") ? stChip("fail", T("최근 실패")) : stChip("done", T("최근 완료"))) : stChip("todo", T("쉬는 중")));
     card.appendChild(head);
     if (c.cycle) { // Auto 절 Cycle 목표 하나. 옛 Auto 목표 큐 칸을 261026-jipsa-07에서 이것으로 바꿨다. 작은 그래프는 그 목표의 Cycle 값이다
       const cy = c.cycle, box = el("div", "psec pcyc");
       if (cy.rounds.length || cy.base != null) box.appendChild(boardSpark(cy)); // 잰 값이 없으면 그래프 자리를 비우지 않는다
-      const t = el("div", "pcyc-t"); t.appendChild(el("div", "lbl", "Cycle 목표"));
+      const t = el("div", "pcyc-t"); t.appendChild(el("div", "lbl", T("Cycle 목표")));
       t.appendChild(el("div", "cyc-t", cy.title.length > 18 ? `${cy.title.slice(0, 18)}…` : cy.title)); t.title = cy.title;
-      t.appendChild(el("div", "mono cyc-s", `Cycle ${cy.rounds.length}${cy.pending ? ", 목표 미정" : cy.target != null ? `, 목표 ${cy.target} ${cy.direction}` : ""}`));
-      if (cy.pending) t.title = `${cy.title}. 목표 미정: ${cy.pending}을 Cycle 1 분석이 정한다`;
+      t.appendChild(el("div", "mono cyc-s", `Cycle ${cy.rounds.length}${cy.pending ? T(", 목표 미정") : cy.target != null ? T(", 목표 {t} {d}", { t: cy.target, d: T(cy.direction) }) : ""}`));
+      if (cy.pending) t.title = T("{t}. 목표 미정: {p}을 Cycle 1 분석이 정한다", { t: cy.title, p: cy.pending });
       if ((cy.branches || []).length) { // 아이디어 갈래 줄(261029-jipsa-10 1안). 열림과 닫힘 수, 지금 갈래, 툴팁에 갈래별 바퀴 수
         const bs = cy.branches, cnt = (s) => bs.filter((b) => b.status === s).length, last = [...cy.rounds].reverse().find((r) => r.branch);
-        const bl = el("div", "mono cyc-s", `갈래 열림 ${cnt("열림")} 닫힘 ${cnt("닫힘")}${cnt("사람 확인") ? ` 사람 확인 ${cnt("사람 확인")}` : ""}${last ? `, 지금 [${last.branch}]` : ""}`);
+        const bl = el("div", "mono cyc-s", T("갈래 열림 {o} 닫힘 {c}", { o: cnt("열림"), c: cnt("닫힘") }) + (cnt("사람 확인") ? T(" 사람 확인 {n}", { n: cnt("사람 확인") }) : "") + (last ? T(", 지금 [{b}]", { b: last.branch }) : ""));
         bl.title = bs.map((b) => `${b.name}: ${b.status}, ${b.rounds}바퀴, 연속 미개선 ${b.streak}${b.closed_at ? `, Cycle ${b.closed_at}에 닫힘` : ""}`).join("\n");
         t.appendChild(bl);
       }
@@ -1889,39 +1888,39 @@ ${v}${ims.length ? `
     }
     const ul = el("ul", "pl");
     for (const q of cues.slice(0, 2)) {
-      const li = el("li", "q"); li.appendChild(stChip(cueCls(q.kind), q.kind)); li.appendChild(el("span", "tt", q.title)); li.title = q.title;
+      const li = el("li", "q"); li.appendChild(stChip(cueCls(q.kind), stName(q.kind))); li.appendChild(el("span", "tt", q.title)); li.title = q.title;
       ul.appendChild(clickable(li, () => openResult(q.run_id)));
     }
-    if (n > 2) { const li = el("li", "more"); li.appendChild(el("span", "tt", `확인 필요 ${n - 2}건 더`)); ul.appendChild(clickable(li, goCue)); }
-    if (ul.children.length) { const box = cardSec("pcue", "확인 필요"); box.appendChild(ul); card.appendChild(box); }
+    if (n > 2) { const li = el("li", "more"); li.appendChild(el("span", "tt", T("확인 필요 {n}건 더", { n: n - 2 }))); ul.appendChild(clickable(li, goCue)); }
+    if (ul.children.length) { const box = cardSec("pcue", T("확인 필요")); box.appendChild(ul); card.appendChild(box); }
     // 최근 결과 줄(261031-jipsa-08): 24시간 안에 끝난 실행을 끝난 순으로 3건까지. 확인을 거친 완료는 확인 필요 목록에서 빠지고 카드에 자리가 없어
     // 답으로 낳은 초안이 어디에도 보이지 않았다. 다른 실행의 답으로 시작한 실행은 부모 바로 아래에 들여 쓴다. 누르면 결과지이고 마우스 올림에 제목과 넣은 답이다
     const rc = c.recent || [];
-    if (!rc.length) card.appendChild(cardSec("prc", "최근 결과", "24시간 안에 끝난 실행 없음"));
+    if (!rc.length) card.appendChild(cardSec("prc", T("최근 결과"), T("24시간 안에 끝난 실행 없음")));
     else {
-      const box = cardSec("prc", "최근 결과");
+      const box = cardSec("prc", T("최근 결과"));
       const rl = el("ul", "pl");
       const all = state.rcOpen?.has(c.name); // 더 보기 줄을 누르면 그 카드만 전부 펼친다. 다음 상태 응답에도 남는다
       for (const r of (all ? rc : rc.slice(0, 3))) {
         const li = el("li", `q rc${r.parent ? " child" : ""}`);
-        li.appendChild(stChip(r.status === "실패" ? "fail" : "done", r.status));
+        li.appendChild(stChip(r.status === "실패" ? "fail" : "done", stName(r.status)));
         li.appendChild(el("span", "tt", r.label || r.title)); // 끝난 시각의 상대 표시는 뗐다(261031-jipsa-09)
         if (r.draft) li.appendChild(draftTag(r)); // 초안 실행은 제목 뒤에 초안 표식(261031-jipsa-10)
-        li.title = `${r.title}${r.answer ? `\n답 들어감: ${r.answer}` : ""}${r.parent ? `\n위 실행에 넣은 답으로 시작했다` : ""}`;
+        li.title = `${r.title}${r.answer ? T("\n답 들어감: {a}", { a: r.answer }) : ""}${r.parent ? T("\n위 실행에 넣은 답으로 시작했다") : ""}`;
         rl.appendChild(clickable(li, () => openResult(r.run_id)));
       }
-      if (rc.length > 3 && !all) { const li = el("li", "more"); li.appendChild(el("span", "tt", `최근 결과 ${rc.length - 3}건 더`)); li.title = "누르면 전부 펼친다"; rl.appendChild(clickable(li, () => { (state.rcOpen ||= new Set()).add(c.name); drawBoard(state.data); })); }
+      if (rc.length > 3 && !all) { const li = el("li", "more"); li.appendChild(el("span", "tt", T("최근 결과 {n}건 더", { n: rc.length - 3 }))); li.title = T("누르면 전부 펼친다"); rl.appendChild(clickable(li, () => { (state.rcOpen ||= new Set()).add(c.name); drawBoard(state.data); })); }
       box.appendChild(rl); card.appendChild(box);
     }
-    const rbox = cardSec("prun", "진행 중인 실행", run ? "" : "진행 중인 실행 없음");
+    const rbox = cardSec("prun", T("진행 중인 실행"), run ? "" : T("진행 중인 실행 없음"));
     if (run) rbox.appendChild(stepLines(c));
     card.appendChild(rbox);
     // 숫자 4칸(진행 중, 확인 필요, 할 일, 미병합) 대신 미병합 한 줄이다(42 초안 우선순위 8, 11). 진행 중과 확인 필요는 머리 칩과 목록이 보이고 할 일은 TODO 탭에 있다
-    const um = c.unmerged, ft = el("div", "pft"), umb = el("span", null, "미병합 ");
+    const um = c.unmerged, ft = el("div", "pft"), umb = el("span", null, T("미병합 "));
     umb.appendChild(el("b", um >= 3 ? "v-warn" : "", um == null ? "-" : String(um)));
-    umb.title = um == null ? "저장소가 git이 아니거나 기본 브랜치가 없다" : "main에 병합되지 않은 orch/ 브랜치 수. 5분마다 다시 센다";
+    umb.title = um == null ? T("저장소가 git이 아니거나 기본 브랜치가 없다") : T("main에 병합되지 않은 orch/ 브랜치 수. 5분마다 다시 센다");
     ft.appendChild(umb);
-    if (c.todo_n) { const td = el("span", null, "할 일 "); td.appendChild(el("b", null, String(c.todo_n))); ft.appendChild(td); }
+    if (c.todo_n) { const td = el("span", null, T("할 일 ")); td.appendChild(el("b", null, String(c.todo_n))); ft.appendChild(td); }
     card.appendChild(ft);
     return card;
   }
@@ -1933,14 +1932,14 @@ ${v}${ims.length ? `
     wrap.hidden = !cue.length && !stalled.length;
     if (wrap.hidden) { $("cueList").textContent = ""; return; }
     const n = (k) => cue.filter((q) => q.kind === k).length;
-    const kinds = [["종합 보고", n("종합 보고")], ["답 대기", n("답 대기")], ["실패", n("실패")], ["확인 전 완료", n("확인 필요")]].filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(", ");
+    const kinds = [["종합 보고", n("종합 보고")], ["답 대기", n("답 대기")], ["실패", n("실패")], ["확인 전 완료", n("확인 필요")]].filter(([, v]) => v).map(([k, v]) => `${T(k)} ${v}`).join(", ");
     const tt = el("span", "tt");
-    if (cue.length) { tt.appendChild(el("b", null, `확인 필요 ${cue.length}건`)); tt.append(` ${kinds}`); }
+    if (cue.length) { tt.appendChild(el("b", null, T("확인 필요 {n}건", { n: cue.length }))); tt.append(` ${kinds}`); }
     if (stalled.length) {
       const r = stalled[0];
-      tt.append(`${cue.length ? ". " : ""}${pname(r.project)} ${r.title}, ${r.stall_min}분째 활동이 없다. 띄운 세션에 깨우라고 알렸다`);
-      const b = el("button", "acc", "결과지 열기"); b.type = "button"; b.addEventListener("click", () => openResult(r.run_id)); box.appendChild(stChip("stop", "멈춤")); box.appendChild(tt); box.appendChild(b);
-    } else { box.appendChild(stChip("cue", "지금 볼 것")); box.appendChild(tt); }
+      tt.append((cue.length ? ". " : "") + T("{p} {t}, {n}분째 활동이 없다. 띄운 세션에 깨우라고 알렸다", { p: pname(r.project), t: r.title, n: r.stall_min }));
+      const b = el("button", "acc", T("결과지 열기")); b.type = "button"; b.addEventListener("click", () => openResult(r.run_id)); box.appendChild(stChip("stop", T("멈춤"))); box.appendChild(tt); box.appendChild(b);
+    } else { box.appendChild(stChip("cue", T("지금 볼 것"))); box.appendChild(tt); }
     drawCueQueue(cue);
   }
   function drawBoard(data) {
@@ -1966,24 +1965,24 @@ ${v}${ims.length ? `
   // 쉬는 프로젝트 한 줄 표(구역 6): 프로젝트, 최근 결과(누르면 결과지), 미병합, 언제. 최근 기록이 없는 프로젝트는 맨 아래 한 줄에 이름만 적는다
   function drawIdleTable(rest, idle) {
     const t = $("idleTable"); t.textContent = "";
-    $("idleN").textContent = `${rest.length + idle.length}개`;
+    $("idleN").textContent = T("{n}개", { n: rest.length + idle.length });
     const sorted = [...rest].sort((a, b) => String(b.last?.finished || "").localeCompare(String(a.last?.finished || "")));
     for (const c of sorted) {
       const tr = el("tr"); tr.appendChild(el("td", "p", pname(c.name)));
-      const lb = el("td", `lb${c.last && c.last.status === "실패" ? " fail" : ""}`, c.last ? (c.last.label || c.last.title) : "최근 기록 없음");
+      const lb = el("td", `lb${c.last && c.last.status === "실패" ? " fail" : ""}`, c.last ? (c.last.label || c.last.title) : T("최근 기록 없음"));
       if (c.last) { lb.title = c.last.title; clickable(lb, () => openResult(c.last.run_id)); } else lb.className = "note";
       tr.appendChild(lb);
-      tr.appendChild(el("td", "n", c.unmerged == null ? "" : `미병합 ${c.unmerged}`));
+      tr.appendChild(el("td", "n", c.unmerged == null ? "" : T("미병합 {n}", { n: c.unmerged })));
       tr.appendChild(el("td", "t", c.last ? ago(c.last.finished) : ""));
       t.appendChild(tr);
     }
-    if (idle.length) { const tr = el("tr"), td = el("td", "note", `${idle.map(pname).join(", ")}은 최근 기록이 없다`); td.colSpan = 4; tr.appendChild(td); t.appendChild(tr); }
-    if (!sorted.length && !idle.length) { const tr = el("tr"), td = el("td", "note", "모든 프로젝트가 돌고 있다"); td.colSpan = 4; tr.appendChild(td); t.appendChild(tr); }
+    if (idle.length) { const tr = el("tr"), td = el("td", "note", T("{p}은 최근 기록이 없다", { p: idle.map(pname).join(", ") })); td.colSpan = 4; tr.appendChild(td); t.appendChild(tr); }
+    if (!sorted.length && !idle.length) { const tr = el("tr"), td = el("td", "note", T("모든 프로젝트가 돌고 있다")); td.colSpan = 4; tr.appendChild(td); t.appendChild(tr); }
   }
   // 오늘 끝난 일 최근 5건(구역 7): 시각, 프로젝트, 결과 이름(누르면 결과지), 요약 한 줄. 전체는 오늘 보고에서 본다
   function drawTodayTable(rows, total) {
     const t = $("todayTable"); t.textContent = "";
-    $("todayN").textContent = total ? `${total}건, 최근 ${Math.min(5, rows.length)}건` : "";
+    $("todayN").textContent = total ? T("{n}건, 최근 {m}건", { n: total, m: Math.min(5, rows.length) }) : "";
     $("todayEmpty").hidden = rows.length > 0;
     for (const r of rows) {
       const tr = el("tr"); tr.appendChild(el("td", "tm", hhmm(parse(r.finished)))); tr.appendChild(el("td", "p", pname(r.project)));
@@ -1996,7 +1995,7 @@ ${v}${ims.length ? `
 
   // ----- 확인 필요 목록(3안, 44에서 현황판 띠 아래로): 답하기 단추가 붙은 한 줄씩의 큐 -----
   function queueRow(kind, cls, project, title, sub, when, act, runId) {
-    const li = el("li"); li.appendChild(stChip(cls, kind)); li.appendChild(el("span", "mono pj", pname(project)));
+    const li = el("li"); li.appendChild(stChip(cls, stName(kind))); li.appendChild(el("span", "mono pj", pname(project)));
     const t = el("span", "tt"); t.appendChild(document.createTextNode(title)); if (sub) t.appendChild(el("span", "tsub", sub)); t.title = title; li.appendChild(t);
     li.appendChild(el("span", "muted mono when", when));
     const b = el("button", kind === "실패" ? "" : "acc", act); b.type = "button"; b.addEventListener("click", (ev) => { ev.stopPropagation(); openResult(runId); }); li.appendChild(b);
@@ -2077,7 +2076,7 @@ ${v}${ims.length ? `
       if (state.view !== "live") return; // 받는 사이 지난 날짜로 옮겼다
       state.data = { ...(state.data && !state.data.date ? state.data : {}), ...data }; render();
       if (data.confirm && !state.moved) { state.moved = true; moveLocalRead(data.confirm); }
-    } catch (e) { $("mode").textContent = "서버에 닿지 않는다"; }
+    } catch (e) { $("mode").textContent = T("서버에 닿지 않는다"); }
     clearTimeout(state.pollTimer);
     if (state.view === "live" && state.pollSec > 0) state.pollTimer = setTimeout(pollLive, state.pollSec * 1000);
   }
@@ -2086,7 +2085,7 @@ ${v}${ims.length ? `
   const setTheme = (t) => {
     document.documentElement.setAttribute("data-theme", t);
     themeWant = t;
-    const b = $("themeBtn"), now = t === "dark" ? "dark" : "white", next = t === "dark" ? "white" : "dark", say = `화면 모드 ${now}. 누르면 ${next}로 바뀐다`;
+    const b = $("themeBtn"), now = t === "dark" ? "dark" : "white", next = t === "dark" ? "white" : "dark", say = T("화면 모드 {now}. 누르면 {next}로 바뀐다", { now, next });
     b.textContent = now; b.title = say; b.setAttribute("aria-label", say);
   };
   let themeWant = null, themeTimer = null;
@@ -2102,6 +2101,28 @@ ${v}${ims.length ? `
   });
   $("themeBtn").addEventListener("animationend", () => $("themeBtn").classList.remove("flipping"));
   window.addEventListener("storage", (e) => { if (e.key === THEME_KEY) { clearTimeout(themeTimer); setTheme(e.newValue === "dark" || e.newValue === "light" ? e.newValue : window.THEME_DEFAULT); } });
+  // 화면 언어(261103-misc-14). 화면 모드와 같은 방식이다. 첫 그리기 전 적용은 index.html 머리에서 하고, 여기서는 KOR/ENG 단추와 다른 탭의 변경을 맞춘 뒤 화면을 다시 그린다
+  const LANG_KEY = "jipsa.lang";
+  const setLang = (l, redraw) => {
+    document.documentElement.setAttribute("lang", l);
+    const b = $("langBtn"), now = l === "en" ? "ENG" : "KOR", next = l === "en" ? "KOR" : "ENG", say = T("화면 언어 {now}. 누르면 {next}로 바뀐다", { now, next });
+    b.textContent = now; b.dataset.lang = l; b.title = say; b.setAttribute("aria-label", say);
+    window.applyStatic();
+    $("drLangNote").hidden = l !== "en";
+    if (!redraw) return;
+    setTheme(themeWant || document.documentElement.getAttribute("data-theme") || window.THEME_DEFAULT); // 화면 모드 단추의 툴팁도 언어를 따른다
+    tfTodoSig = ""; tfBandSig = ""; memoSig = ""; tfPlaceSig = ""; // 같은 값이면 다시 그리지 않는 칸도 글자를 바꾼다
+    render();
+    if (state.open && !$("drawer").hidden) { if (String(state.open).startsWith("report:")) openReport(); else openResult(state.open, true); }
+  };
+  setLang(document.documentElement.getAttribute("lang") === "en" ? "en" : "ko", false);
+  $("langBtn").addEventListener("click", () => {
+    const l = document.documentElement.getAttribute("lang") === "en" ? "ko" : "en";
+    try { localStorage.setItem(LANG_KEY, l); } catch (err) { /* 저장 못 해도 이 화면은 바뀐다 */ }
+    if (/[?&]lang=/.test(location.search)) history.replaceState(null, "", location.pathname + location.search.replace(/([?&])lang=[^&]*&?/, "$1").replace(/[?&]$/, "") + location.hash); // 주소의 언어가 단추보다 앞서지 않게 뗀다
+    setLang(l, true);
+  });
+  window.addEventListener("storage", (e) => { if (e.key === LANG_KEY) setLang(e.newValue === "en" || e.newValue === "ko" ? e.newValue : window.LANG_DEFAULT, true); });
   // 주기는 5, 15, 30, 60초와 멈춤이다. 고른 값은 브라우저에 기억한다. 멈춤이어도 조작 뒤에는 한 번 새로 받는다
   try { const v = localStorage.getItem("jipsa.pollSec"); if (v !== null && [...$("pollSel").options].some((o) => o.value === v)) state.pollSec = +v; } catch (e) { /* 비공개 창 */ }
   $("pollSel").value = String(state.pollSec);
@@ -2118,7 +2139,7 @@ ${v}${ims.length ? `
     if (data.cutoff) ts.push(parse(data.cutoff).getTime());
     state.tmin = ts.length ? Math.min(...ts) : Date.now(); state.tmax = ts.length ? Math.max(...ts) + 60000 : Date.now();
     $("scrub").value = 1000; state.vnow = new Date(state.tmax);
-    $("replayNote").textContent = (data.runs || []).length ? `작업 ${data.runs.length}개` : "그 날짜의 기록이 없다";
+    $("replayNote").textContent = (data.runs || []).length ? T("작업 {n}개", { n: data.runs.length }) : T("그 날짜의 기록이 없다");
     render();
   }
 
@@ -2137,7 +2158,7 @@ ${v}${ims.length ? `
   $("scrub").addEventListener("input", (e) => { stopPlay(); state.vnow = new Date(state.tmin + (state.tmax - state.tmin) * (e.target.value / 1000)); render(); });
   $("play").addEventListener("click", () => (state.playing ? stopPlay() : startPlay()));
   function startPlay() {
-    state.playing = true; $("play").textContent = "멈춤";
+    state.playing = true; $("play").textContent = T("멈춤||play");
     if (+$("scrub").value >= 1000) { $("scrub").value = 0; state.vnow = new Date(state.tmin); }
     state.timer = setInterval(() => {
       const step = (+$("speed").value) * 1000 / 4;
@@ -2146,7 +2167,7 @@ ${v}${ims.length ? `
       render(); if (state.vnow.getTime() >= state.tmax) stopPlay();
     }, 250);
   }
-  function stopPlay() { state.playing = false; $("play").textContent = "재생"; clearInterval(state.timer); }
+  function stopPlay() { state.playing = false; $("play").textContent = T("재생"); clearInterval(state.timer); }
   window.addEventListener("resize", () => render());
 
   state.tab = tabOfHash(); showTab();
