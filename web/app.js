@@ -491,8 +491,8 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
         shape = lane.goal.status === "끝" ? "done" : lane.goal.state_text === "창 멈춤" ? "stop" : "run";
         // 오른쪽 칸이 좁아 줄여 쓴다. 끝난 목표는 ■ 뒤에 종합 보고 상태만, 도는 목표는 단계 이름을 줄인다. 전체 글은 툴팁과 위 목표 줄에 있다
         const w = lane.goal.where || `Cycle ${lane.goal.rounds.length}`;
-        rest.textContent = lane.goal.status === "끝" ? w.split(", ").pop() : w.replace("명령 이행", "이행").replace("분석과 피드백", "분석");
-        tip(st, () => [[lane.goal.title, ""], [T("위치"), lane.goal.where || ""], [T("상태"), lane.goal.state_text], [T("Cycle 수"), `${lane.goal.rounds.length}`], [T("주체"), lane.goal.owner_text]]);
+        rest.textContent = TS(lane.goal.status === "끝" ? w.split(", ").pop() : w.replace("명령 이행", "이행").replace("분석과 피드백", "분석"));
+        tip(st, () => [[lane.goal.title, ""], [T("위치"), TS(lane.goal.where) || ""], [T("상태"), TS(lane.goal.state_text)], [T("Cycle 수"), `${lane.goal.rounds.length}`], [T("주체"), TS(lane.goal.owner_text)]]);
       }
       const sh = stShape(shape, width - RIGHT + 14, y); if (shape === "run") sh.classList.add("pulse");
       g.appendChild(sh); st.appendChild(rest); g.appendChild(st);
@@ -629,7 +629,8 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
       if (n++) box.appendChild(el("span", "hl-sep", "|"));
       const g = el("span", `hl-g ${cls}`); if (label) g.appendChild(el("span", "hl-n", label)); g.title = title; box.appendChild(g); return g;
     };
-    for (const a of h.alerts || []) group("alert", null, a.title).appendChild(el("b", "hl-v crit", a.text));
+    // 서버 경고 글자와 툴팁은 그릴 때만 사전으로 바꾼다. 툴팁 아래 붙는 로그 줄은 맞는 틀이 없어 원문 그대로다
+    for (const a of h.alerts || []) group("alert", null, a.title && String(a.title).split("\n").map((x) => TS(x)).join("\n")).appendChild(el("b", "hl-v crit", TS(a.text)));
     const usage = (name, u, note) => {
       if (!u) return;
       const cut = (v, c, reset) => (v == null ? null : c || (reset && parse(reset) <= vnow) ? 0 : Math.round(v)); // 초기화 시각이 지난 창은 0%
@@ -745,7 +746,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
       if (ended && !divided && rows.some((x) => x.status !== "끝")) { host.appendChild(el("div", "goal-sep", T("끝난 목표"))); divided = 1; } // 진행 중 줄과 펼친 끝난 줄 사이 구분선(261024-jipsa-21)
       const row = el("div", `goal-row${ended ? " ended" : paused ? " paused" : ""}`);
       const nm = el("div", "g-name");
-      if (ended) nm.appendChild(el("em", "g-end", T("끝: {r}", { r: c.end_reason || T("끝") }))); // 끝난 줄은 이름 칸 맨 앞에 끝 사유 표지
+      if (ended) nm.appendChild(el("em", "g-end", T("끝: {r}", { r: TS(c.end_reason) || T("끝") }))); // 끝난 줄은 이름 칸 맨 앞에 끝 사유 표지
       nm.appendChild(el("span", null, pname(c.project))); nm.appendChild(el("b", null, c.title));
       nm.tabIndex = 0; tip(nm, () => [[c.title, ""], [T("프로젝트"), pname(c.project)]]); row.appendChild(nm); // 제목은 한 줄로 줄이고 전체는 툴팁으로 본다
       row.appendChild(el("div", "g-n", `Cycle ${c.rounds.length}`));
@@ -753,11 +754,11 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
       if (c.target != null) rec.appendChild(document.createTextNode(T(" / 목표 {t} {d}", { t: f(c.target), d: T(c.direction || "이상") })));
       row.appendChild(rec);
       row.appendChild(goalSpark(c));
-      const who = el("div", "g-who", T("주체 {o}", { o: c.owner_text || T("작업자") }));
-      if ((c.moves || []).length) { who.textContent += T(" (이동 {n})", { n: c.moves.length }); who.title = c.moves.join("\n"); }
+      const who = el("div", "g-who", T("주체 {o}", { o: TS(c.owner_text) || T("작업자") }));
+      if ((c.moves || []).length) { who.textContent += T(" (이동 {n})", { n: c.moves.length }); who.title = c.moves.map((x) => TS(x)).join("\n"); }
       row.appendChild(who);
-      const gs = el("div", `g-state ${ended ? "ended" : paused ? "paused" : "live"}${c.final && c.final.shown === "확인 필요" ? " cue" : ""}`, c.where || c.state_text || c.phase);
-      gs.title = c.state_text || ""; if (c.final) { gs.style.cursor = "pointer"; gs.addEventListener("click", () => openResult(c.final.run_id)); }
+      const gs = el("div", `g-state ${ended ? "ended" : paused ? "paused" : "live"}${c.final && c.final.shown === "확인 필요" ? " cue" : ""}`, TS(c.where || c.state_text || c.phase));
+      gs.title = TS(c.state_text) || ""; if (c.final) { gs.style.cursor = "pointer"; gs.addEventListener("click", () => openResult(c.final.run_id)); }
       row.appendChild(gs);
       host.appendChild(row);
     }
@@ -1011,7 +1012,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
       const nm = el("div", "nm"), t = el("b");
       t.appendChild(el("span", "lno", `${c.no} `)); t.append(c.text); nm.appendChild(t);
       nm.appendChild(el("div", "meta", pname(c.project)));
-      const st = el("span", `st ${c.state === "closing" ? "stop" : c.running ? "run" : "todo"}`); st.appendChild(el("i")); st.append(c.paused || c.where || c.note); st.title = c.note; nm.appendChild(st);
+      const st = el("span", `st ${c.state === "closing" ? "stop" : c.running ? "run" : "todo"}`); st.appendChild(el("i")); st.append(TS(c.paused || c.where || c.note)); st.title = TS(c.note); nm.appendChild(st);
       if (c.branch || c.branch_open || c.branch_closed) {
         const br = el("div", "br", T("갈래 ")); br.appendChild(el("b", null, c.branch || "-"));
         if (c.branch_open || c.branch_closed) br.appendChild(el("span", "hint", T(" 열림 {a}, 닫힘 {b}", { a: c.branch_open, b: c.branch_closed }))); // 둘 다 0이면 이름만 둔다
@@ -1103,7 +1104,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
     if (g.over) line.appendChild(el("span", "it why", T("GPU 실측이 커 새 GPU 작업을 {t}까지 멈춘다", { t: hhmm(parse(g.over.until)) })));
     item("대기열", q, (r) => `${pname(r.project)} ${r.title}`);
     item("예약", sch, (c) => `${pname(c.project)} ${hhmm(parse(c.start))} ${c.text}`);
-    item("Cycle", cs, (c) => `${pname(c.project)} ${c.text}${c.where ? `, ${c.where}` : ""}`);
+    item("Cycle", cs, (c) => `${pname(c.project)} ${c.text}${c.where ? `, ${TS(c.where)}` : ""}`);
     const b = el("button", "lnk", bandOpen() ? T("접기") : T("펼치기")); b.type = "button"; b.title = T("대기열 빼기, 예약 빼기, Cycle 마감과 피드백과 멈추기");
     b.addEventListener("click", () => { setBandOpen(!bandOpen()); tfBandSig = ""; drawBand(state.data && state.data.todofile ? state.data.todofile.lanes || {} : {}); });
     line.appendChild(b);
@@ -1384,7 +1385,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
     clearTimeout(state.drawerTimer);
     try {
       const r = await fetch(`/api/run?id=${encodeURIComponent(runId)}`); const d = await r.json();
-      if (d.error) { $("drBody").textContent = d.error; return; }
+      if (d.error) { $("drBody").textContent = TS(d.error); return; }
       const m = d.meta;
       $("drName").textContent = runName(m); fitName(runId);
       drawHeadStatus(runId, m, d.shown);
@@ -1414,7 +1415,8 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
         const btns = [];
         const mark = () => { const got = answerPicks($("drInput").value, cs).picks; for (const [b, c] of btns) { const on = got.get(c.group || "") === c.name; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on ? "true" : "false"); } };
         const button = (c, rec) => {
-          const b = el("button", null, rec ? T("{n} (추천)", { n: c.name }) : c.name); b.type = "button"; btns.push([b, c]);
+          const b = el("button", null, rec ? T("{n} (추천)", { n: optName(c.name) }) : optName(c.name)); b.type = "button"; btns.push([b, c]);
+          if (optName(c.name) !== c.name) b.title = T("답 칸에 {n}을 넣는다", { n: c.name }); // 영어 화면은 단추 글자만 바꾸고 답 칸에는 원래 이름이 들어간다
           b.addEventListener("click", () => { const inp = $("drInput"); inp.value = pickAnswer(inp.value, cs, c); mark(); $("drAnswerNote").textContent = T("뒤에 쉼표와 추가 지시를 이어 써도 된다. 답 넣기를 누르면 확정된다"); fitAnswer(); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }); // 한 번 눌러서는 확정되지 않는다
           return b;
         };
@@ -1536,7 +1538,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
     try {
       const r = await fetch(`/api/answer_image?run=${encodeURIComponent(runId)}`, { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
       const d = await r.json();
-      if (!d.ok) { note.textContent = T("그림을 올리지 못했다: {w}", { w: d.why || "" }); return false; }
+      if (!d.ok) { note.textContent = T("그림을 올리지 못했다: {w}", { w: TS(d.why) || "" }); return false; }
       if (state.open !== runId) return false; // 올리는 사이 다른 결과지를 열었다
       const n = pasted.next++; pasted.list.push({ n, name: d.name, url: d.url });
       const before = t.value.slice(0, at[0]), pad = before && !/\s$/.test(before) ? " " : "";
@@ -1576,7 +1578,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
       const r = await fetch("/api/answer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runId, answer: text, images: images || [] }) });
       const d = await r.json();
       // 세션으로 가는 답은 어디로 가는지 같이 보인다. 2분 안에 세션이 받지 않으면 스케줄러 작업자로 넘어간다(261103-jipsa-08)
-      note.textContent = d.ok ? (d.resume ? T("답을 넣었다. 스케줄러가 다음 주기에 이어 돌린다") : T("답을 기록에 적었다. {d}", { d: d.delivery || "" })) : T("넣지 못했다: {w}", { w: d.why || "" });
+      note.textContent = d.ok ? (d.resume ? T("답을 넣었다. 스케줄러가 다음 주기에 이어 돌린다") : T("답을 기록에 적었다. {d}", { d: TS(d.delivery) || "" })) : T("넣지 못했다: {w}", { w: TS(d.why) || "" });
       if (!d.ok) return;
       // 답을 넣으면 서버가 확인을 같이 적는다. 상태 전체를 다시 받는 데 10초쯤 걸리므로 돌려받은 확인 기록으로 먼저 상단, 막대, 서랍 머리를 바꾸고
       // 다 받은 뒤 서랍을 한 번 더 그린다. 옛 서버는 확인 기록을 돌려주지 않으므로 다 받은 뒤에야 바뀐다(261022-jipsa-59)
@@ -1602,7 +1604,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
     box.appendChild(memo);
     // 그 답이 지금 어디에 있는지. 서버 기록에서 읽어 새로 고쳐도 같다. 아무도 받지 않은 답은 처리된 것처럼 읽히지 않게 강조한다(261103-jipsa-08)
     if (a.route) {
-      const line = el("div", a.route.done ? "muted" : "route-open", a.route.text);
+      const line = el("div", a.route.done ? "muted" : "route-open", TS(a.route.text));
       if (a.route.run) { const go = el("a", "", T(" 결과지 열기")); go.href = "#"; go.addEventListener("click", (e) => { e.preventDefault(); openResult(a.route.run); }); line.appendChild(go); }
       box.appendChild(line);
     }
@@ -1650,7 +1652,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
     try {
       const r = await fetch("/api/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runId, action, memo }) });
       const d = await r.json();
-      if (!d.ok) { note.textContent = T("적지 못했다: {w}", { w: d.why || "" }); return; }
+      if (!d.ok) { note.textContent = T("적지 못했다: {w}", { w: TS(d.why) || "" }); return; }
       state.data.confirm = d.confirm; render();
       if (state.open === runId) openResult(runId, true);
       refreshNow(); // 실패가 완료로 바뀌거나 돌아오므로 실행 상태를 서버에서 다시 받는다
@@ -1667,7 +1669,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
     $("drawer").hidden = false; $("scrim").hidden = false; $("drAnswer").hidden = true; $("drFoot").hidden = true; $("drFoot").textContent = "";
     $("drName").textContent = T("보고 {d}", { d: date }); fitName(""); $("drStatus").textContent = ""; $("drStatus").className = "stpill"; $("drMeta").textContent = ""; $("drBody").textContent = T("불러오는 중");
     $("drRaw").href = `/api/report?date=${encodeURIComponent(date)}`; $("drRawLine").hidden = false; setPreview("");
-    try { const r = await fetch(`/api/report?date=${encodeURIComponent(date)}`); const d = await r.json(); renderMd(d.text || "", $("drBody")); foldReport($("drBody")); }
+    try { const r = await fetch(`/api/report?date=${encodeURIComponent(date)}`); const d = await r.json(); renderMd((d.text || "").split("\n").map((l) => dayLine(l)).join("\n"), $("drBody")); foldReport($("drBody")); }
     catch (e) { $("drBody").textContent = T("보고를 불러오지 못했다"); }
   }
   // 하루 보고의 항목 줄(프로젝트 | 지시 | 결과 | 커밋이나 바뀐 파일 | 분)은 프로젝트, 결과, 분만 보이고 지시문 전문과 아래 분석, 주체, 토큰 줄은 자세히로 접는다(42 초안 우선순위 6)
@@ -1680,9 +1682,9 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
       const [pj, title, result, ...tail] = parts;
       const mn = tail.length && /^\d+분$/.test(tail[tail.length - 1]) ? tail.pop() : "";
       li.textContent = ""; li.className = "day";
-      const l1 = el("div", "l1"); l1.appendChild(el("span", "pj", pname(pj))); l1.appendChild(el("span", "rs", result)); if (mn) l1.appendChild(el("span", "mn", mn)); li.appendChild(l1);
+      const l1 = el("div", "l1"); l1.appendChild(el("span", "pj", pname(pj))); l1.appendChild(el("span", "rs", resultHead(result))); if (mn) l1.appendChild(el("span", "mn", TS(mn))); li.appendChild(l1);
       const det = el("details"); det.appendChild(el("summary", null, T("자세히")));
-      det.appendChild(el("p", null, T("지시: {t}", { t: title }))); if (tail.length) det.appendChild(el("p", null, tail.join(", ")));
+      det.appendChild(el("p", null, T("지시: {t}", { t: title }))); if (tail.length) det.appendChild(el("p", null, tail.map((x) => TS(x)).join(", ")));
       if (sub) det.appendChild(sub);
       li.appendChild(det);
     }
@@ -1701,6 +1703,9 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
     return a.state === "있음" ? T("판정 {v}, {s}", { v: a.verdict, s: atkShort(r) }) + (a.rebut ? T(", 반박 {n}", { n: a.rebut }) : "") + (a.unanswered ? T(", 답 없음 {n}", { n: a.unanswered }) : "") : T("공격 없음({w})", { w: a.why || T("사유 없음") });
   }
   // ----- 작은 마크다운 그리기. 글자는 모두 textContent로 넣는다 -----
+  // 결과지에 서버가 붙이는 줄(커밋, 열어 볼 파일, Sol 판정, 대체 보고 문장)만 영어로 바꾼다. 작업자 본문 문단은 그대로다
+  const SHEET_LINE = /^(커밋: |열어 볼 파일|Sol 판정은 |Sol 공격 없음\(|보고서가 없다\. |걸린 규칙은 |선택지는 아래와 같다\. |\(없음\)$)/;
+  const sheetLine = (l) => (SHEET_LINE.test(l) ? TS(l) : l);
   function renderMd(text, host, base) {
     host.textContent = "";
     const src = (s) => (/^(https?:|data:|\/)/.test(s) ? s : (base || "") + s);
@@ -1715,7 +1720,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
         const buf = []; let sum = ""; i++;
         while (i < lines.length && !/^<\/details>\s*$/.test(lines[i])) { const s = /^<summary>(.*)<\/summary>\s*$/.exec(lines[i]); if (s && !sum) sum = s[1]; else buf.push(lines[i]); i++; }
         i++;
-        const d = el("details", "fold"); d.appendChild(el("summary", null, sum || T("펼치기"))); const inner = el("div"); renderMd(buf.join("\n"), inner, base); d.appendChild(inner); host.appendChild(d); continue;
+        const d = el("details", "fold"); d.appendChild(el("summary", null, sum ? foldTitle(sum) : T("펼치기"))); const inner = el("div"); renderMd(buf.join("\n"), inner, base); d.appendChild(inner); host.appendChild(d); continue;
       }
       if (/^```/.test(line)) {
         flushPara(); closeLists(0);
@@ -1725,7 +1730,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
         i++;
         if (["요약", "용어", "핵심"].includes(lang)) { // 보고서의 요약 상자
           const box = el("aside", "box"); box.appendChild(el("div", "label", T(lang)));
-          for (const l of buf) if (l.trim()) { const p = el("p"); inline(l, p); box.appendChild(p); }
+          for (const l of buf) if (l.trim()) { const p = el("p"); inline(sumLine(l), p); box.appendChild(p); }
           host.appendChild(box); continue;
         }
         const pre = el("pre"); pre.appendChild(el("code", null, buf.join("\n"))); host.appendChild(pre); continue;
@@ -1742,15 +1747,18 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
       if (cap) { flushPara(); closeLists(0); const c = el("div", "caption"); inline(cap[1], c); host.appendChild(c); i++; continue; }
       if (/^>\s?/.test(line)) { flushPara(); closeLists(0); const q = el("blockquote"); inline(line.replace(/^>\s?/, ""), q); host.appendChild(q); i++; continue; }
       const h = /^(#{1,3})\s+(.*)$/.exec(line);
-      if (h) { flushPara(); closeLists(0); const e = el(`h${h[1].length}`); inline(h[2], e); host.appendChild(e); i++; continue; }
+      if (h) { flushPara(); closeLists(0); const e = el(`h${h[1].length}`); inline(TX(h[2]), e); host.appendChild(e); i++; continue; }
       if (/^\s*\|.*\|\s*$/.test(line)) {
         flushPara(); closeLists(0);
         const rows = []; while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) rows.push(lines[i++]);
         const table = el("table"); let head = true;
+        // 표 머리 칸은 정확히 맞는 이름만 바꾼다. Sol 공격 표(머리에 심각도와 답)는 심각도, 종류, 답 칸 값도 바꾼다
+        const hcells = rows.length ? rows[0].trim().slice(1, -1).split("|").map((c) => c.trim()) : [];
+        const atk = hcells.includes("심각도") && hcells.includes("답") ? new Set(["심각도", "종류", "답"].map((k) => hcells.indexOf(k))) : null;
         for (const r of rows) {
           if (/^\s*\|[\s:|-]+\|\s*$/.test(r)) { head = false; continue; }
           const cells = r.trim().slice(1, -1).split("|");
-          const tr = el("tr"); for (const c of cells) { const cell = el(head ? "th" : "td"); inline(c.trim(), cell); tr.appendChild(cell); } table.appendChild(tr);
+          const tr = el("tr"); cells.forEach((c, ci) => { const cell = el(head ? "th" : "td"); inline(head ? TX(c.trim()) : atk && atk.has(ci) ? atkCell(c.trim()) : c.trim(), cell); tr.appendChild(cell); }); table.appendChild(tr);
           if (head) head = false;
         }
         host.appendChild(table); continue;
@@ -1769,7 +1777,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
       }
       if (!line.trim()) { flushPara(); closeLists(0); i++; continue; }
       if (listStack.length && /^\s{2,}/.test(line)) { const last = listStack[listStack.length - 1].lastElementChild; if (last) { last.appendChild(document.createTextNode(" ")); inline(line.trim(), last); i++; continue; } }
-      closeLists(0); para.push(line.trim()); i++;
+      closeLists(0); para.push(sheetLine(line.trim())); i++;
     }
     flushPara();
   }
@@ -1882,7 +1890,7 @@ ${T("서브에이전트")} ${m.run.agent}` : ""}` : "" });
         bl.title = bs.map((b) => `${b.name}: ${b.status}, ${b.rounds}바퀴, 연속 미개선 ${b.streak}${b.closed_at ? `, Cycle ${b.closed_at}에 닫힘` : ""}`).join("\n");
         t.appendChild(bl);
       }
-      const st = el("div", "cyc-st"); st.appendChild(stChip(cycLive(c) ? "run" : "todo", cy.where || cy.status)); t.appendChild(st);
+      const st = el("div", "cyc-st"); st.appendChild(stChip(cycLive(c) ? "run" : "todo", TS(cy.where || cy.status))); t.appendChild(st);
       box.appendChild(t);
       card.appendChild(box);
     }

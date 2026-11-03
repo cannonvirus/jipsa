@@ -1,7 +1,7 @@
 /* jipsa 대시보드 화면 글자 사전(261103-misc-14). 한국어 원문이 키이고 ko 값은 키 그대로, en 값은 아래 표다.
    같은 한국어가 뜻이 갈리면 "멈춤||poll"처럼 || 뒤에 갈래를 붙이고 ko 화면은 || 앞만 보인다.
    상태 값(완료, 실패, 확인 필요 등)은 저장 데이터와 비교 코드와 CSS 선택자에서 그대로 쓰고, 화면에 보일 때만 이 사전을 지난다.
-   서버가 보내는 문구와 결과지 본문은 사전에 넣지 않는다. 언어는 html lang 속성 하나로 정하고 index.html 머리가 첫 그리기 전에 넣는다 */
+   결과지 본문은 사전에 넣지 않는다. 서버가 보내는 문구(경고, Cycle 위치, 표 머리, 오늘 보고 라벨)는 아래 SRV와 틀 표로 그릴 때만 바꾼다(261103-misc-17). 언어는 html lang 속성 하나로 정하고 index.html 머리가 첫 그리기 전에 넣는다 */
 (() => {
   const EN = {
     "완료": "Done",
@@ -83,7 +83,7 @@
     "프로젝트": "Project",
     "할 일 한 줄": "One-line to-do",
     "할 일 한 줄 | 기준(선택)": "One-line to-do | criteria (optional)",
-    "형식은 할 일 | 기준 | cycle 지표 목표값 이상 상한 N | 한도 VRAM 6GB, RAM 12GB이고 기준부터는 모두 선택이다. cycle 미정이면 첫 분석이 지표와 목표값을 정한다. 넣어도 돌지 않는다": "Format: to-do | criteria | cycle metric target 이상 상한 N | 한도 VRAM 6GB, RAM 12GB; everything from criteria on is optional. With cycle 미정 the first analysis sets the metric and target. Adding does not start it",
+    "형식은 할 일 | 기준 | cycle 지표 목표값 이상 상한 N | 한도 VRAM 6GB, RAM 12GB이고 기준부터는 모두 선택이다. cycle 미정이면 첫 분석이 지표와 목표값을 정한다. 넣어도 돌지 않는다": "Format: to-do | criteria | cycle metric target 이상 상한 N | 한도 VRAM 6GB, RAM 12GB; everything from criteria on is optional. The Korean words are syntax: 이상 means at least (이하, at most), 상한 N stops after N Cycles without gain, 한도 sets resource limits, and with cycle 미정 (undecided) the first analysis sets the metric and target. Adding does not start it",
     "넣기": "Add",
     "새 프로젝트 이름": "New project name",
     "새 프로젝트 이름 (영문 소문자, 숫자, 밑줄)": "New project name (lowercase letters, digits, underscore)",
@@ -294,12 +294,13 @@
     "초안 실행인데 결과 파일의 미리보기 주소가 비어 초안 보기 단추가 뜨지 않는다": "This is a draft run, but the result file has no preview address, so the Draft view button does not appear",
     "초안, 주소 없음": "Draft, no address",
     "불러오는 중": "Loading",
-    "확인 필요 결과다. 확인이라고 넣거나 덧붙일 지시를 적으면 확인되어 완료가 된다. 지시는 세션에 넘어가고 다시 돌리지 않는다.": "This result needs attention. Enter 확인 or add an instruction and it is acknowledged and becomes Done. The instruction goes to the session and the job is not run again.",
+    "확인 필요 결과다. 확인이라고 넣거나 덧붙일 지시를 적으면 확인되어 완료가 된다. 지시는 세션에 넘어가고 다시 돌리지 않는다.": "This result needs attention. Enter 확인 (acknowledge) or add an instruction and it is acknowledged and becomes Done. The instruction goes to the session and the job is not run again.",
     "확인 필요 결과다. {c}직접 적어 넣으면 확인되어 완료가 된다. 답은 세션에 넘어가고 다시 돌리지 않는다.{a}": "This result needs attention. {c}Type an answer and it is acknowledged and becomes Done. The answer goes to the session and the job is not run again.{a}",
     "안을 누르거나 ": "Click an option or ",
     " 안은 보고서 정할 것에서 자동으로 뽑았다.": " The options were taken automatically from the report's decisions.",
     "고를 것이 남은 {s} 결과다. {c}직접 적는다. 답은 세션에 넘어가고 다시 돌리지 않는다.{a}": "A {s} result with choices left. {c}type your own. The answer goes to the session and the job is not run again.{a}",
     "{n} (추천)": "{n} (recommended)",
+    "답 칸에 {n}을 넣는다": "Puts {n} in the answer box",
     "뒤에 쉼표와 추가 지시를 이어 써도 된다. 답 넣기를 누르면 확정된다": "You may add a comma and more instructions. Click Submit answer to confirm",
     "{k} {n}개": "{k} ({n})",
     "그 밖의 정할 것": "Other decisions",
@@ -430,7 +431,278 @@
     document.title = T(document.__tTitle);
     document.documentElement.setAttribute("data-i18n", lang());
   };
-  window.I18N = { en: EN, lang, T, applyStatic, KEY: "jipsa.lang" };
+  // ----- 서버 문구(261103-misc-17 1안). 서버는 한국어 원문을 그대로 보내고, 화면에 그리기 직전에만 아래 표로 바꾼다 -----
+  // 값 비교, CSS 선택자, 답으로 보내는 값은 서버 원문 그대로 쓴다. 서버 문구가 바뀌면 이 표도 같이 고친다
+  // SRV는 문장 전체가 같을 때만 바꾸는 표다. 없으면 위 EN 표를 본다
+  const SRV = {
+    // 머리 줄 경고와 툴팁(scheduler/web.py 경고 8종)
+    "스케줄러 꺼짐": "Scheduler off",
+    "Slack 연결 안 됨": "Slack not connected",
+    "Slack이 연결되지 않았다. 보고는 파일에만 남는다": "Slack is not connected. Reports are kept in files only",
+    "심장박동이 멈췄다. 프로세스는 있다": "The heartbeat stopped. The process still exists",
+    "uv run jipsa web으로 켠다": "Start it with uv run jipsa web",
+    // Cycle 단계, 위치, 상태 글자, 주체(scheduler/cycle.py)
+    "명령 이행": "Run",
+    "분석과 피드백": "Analysis and feedback",
+    "목표 판정": "Goal judgment",
+    "이행": "Run",
+    "분석": "Analysis",
+    "목표 정하기": "Goal setting",
+    "정하는 중": "drafting",
+    "다시 정하기 대기": "waiting to redo",
+    "박음": "fixed",
+    "진행": "Running",
+    "창 멈춤": "Paused (usage window)",
+    "Main": "Main",
+    "종합 보고 대기": "final report pending",
+    "종합 보고 중": "final report running",
+    "종합 보고 확인 필요": "final report needs attention",
+    "종합 보고 확인함": "final report acknowledged",
+    "종합 보고 실패": "final report failed",
+    "Auto 종합 보고 대기": "Auto final report pending",
+    "통과": "Pass",
+    "보완": "Needs work",
+    "재작업": "Rework",
+    "환경 실패 상한": "environment failure limit",
+    "목표 도달": "target reached",
+    "사람 멈춤": "stopped by a person",
+    "다음 명령이 금지 사항": "next plan is forbidden",
+    "다음 명령 1순위와 차순위가 모두 버린 가설": "both next plans are discarded hypotheses",
+    "이행 확인 필요": "run needs attention",
+    "Cycle 단계 대기": "waiting for a Cycle step",
+    "시작 대기": "waiting to start",
+    // 시킨 줄 상태 글(scheduler/auto.py run_note)
+    "곧 작업자로 시작한다": "starts soon with a worker",
+    "곧 시작한다": "starts soon",
+    "상한이 차 기다린다": "waiting, the limit is full",
+    "기다린다": "waiting",
+    "기준 정하기 중. 끝나면 1안 기준으로 본 작업을 잇는다": "Setting criteria. When done, the main job continues with the criteria of option 1",
+    "Cycle 목표를 돈다": "running the Cycle goal",
+    "도는 중": "running",
+    "마감, 돌던 단계가 끝나면 닫는다": "cutoff; closes when the running step ends",
+    "세션에 보낸 줄. 세션이 받아 서브에이전트로 시작한다": "Sent to the session. The session starts it as a subagent",
+    // 오늘 보고(종합 보고) 절 이름과 라벨(scheduler/report.py)
+    "환경": "Environment",
+    "단발 목표 분석과 반영 Cycle": "Single-run review and revise Cycle",
+    "없음": "None",
+    "완료(원래 실패)": "Done (originally failed)",
+    "분석자 같은 공급자": "analyst from the same provider",
+    "이동 없음": "no moves",
+    "지표 없음": "no metric",
+    "나아짐": "improved",
+    "나아지지 않음": "no gain",
+    "피드백 없음": "no feedback",
+    "분석과 피드백 중": "Analysis and feedback in progress",
+    "명령 이행 중": "Run in progress",
+    "분석 재측정": "re-measured by analysis",
+    "1순위": "first choice",
+    "차순위": "second choice",
+    "대기(cycle next나 스케줄러가 연다)": "pending (opened by cycle next or the scheduler)",
+    "기준": "Criterion",
+    "판정": "Verdict",
+    "확인 항목": "Check item",
+    // 결과지 규격(policies/report.md)의 절 이름과 대체 보고(scheduler/record.py)
+    "남은 일과 정할 것": "Remaining work and decisions",
+    "실패 사유": "Failure reason",
+    "원본 파일과 커밋": "Source files and commit",
+    "보고서가 없다. 작업자가 report.md를 쓰지 않았거나 작업이 아직 끝나지 않았다.": "There is no report. The worker did not write report.md, or the job has not finished yet.",
+    "선택지는 아래와 같다. 추천이 앞에 있다.": "The options are below. The recommended one comes first.",
+    "(없음)": "(none)",
+    // Sol 공격 표 머리와 값(scheduler/attack.py)
+    "번호": "No.",
+    "심각도": "Severity",
+    "종류": "Kind",
+    "문제 주장": "Claim",
+    "문제": "Problem",
+    "근거 위치": "Evidence location",
+    "확인 방법": "How to check",
+    "답": "Answer",
+    "답 내용": "Answer note",
+    "반대 검토 0건": "Counter-review: 0",
+    // 답 넣기와 그림 올리기 실패 안내(scheduler/record.py, web.py)
+    "기록이 없는 실행ID": "No record for this run ID",
+    "이미 답이 들어갔다. 바꾸려면 --undo로 물린 뒤 다시 넣는다": "An answer is already in. To change it, withdraw it with --undo and enter it again",
+    "사람이 답 없이 확인해 닫은 실행이다. 결과지의 '확인 필요로 되돌리기'를 누른 뒤 넣는다": "A person acknowledged and closed this run without an answer. Press 'Back to Needs attention' on the result sheet first",
+    "답 없이 확인한 실행이다(확인함). 결과지의 '확인 필요로 되돌리기'를 누른 뒤 넣는다": "This run was acknowledged without an answer. Press 'Back to Needs attention' on the result sheet first",
+    "큐에 없는 실행ID": "This run ID is not in the queue",
+    "PNG, JPEG, GIF, WebP가 아니다": "Not a PNG, JPEG, GIF, or WebP image",
+    "세션 전용 프로젝트라 세션이 받을 때까지 기다린다.": "This is a session-only project, so it waits until a session takes it.",
+    "스케줄러가 꺼져 있어 세션이 받거나 스케줄러가 켜질 때까지 기다린다.": "The scheduler is off, so it waits until a session takes it or the scheduler starts.",
+    "2분 안에 세션이 받지 않으면 스케줄러 작업자로 넘긴다.": "If no session takes it within 2 minutes, it goes to a scheduler worker."
+  };
+  // 틀 문장. {n}으로 시작하는 칸은 숫자, {hm}은 시각, {x}는 작업 글이고 그대로 옮긴다. 나머지 칸은 다시 이 표로 바꾼다. 위에서부터 처음 맞는 틀을 쓴다
+  const PAT_SRC = [
+    ["스케줄러 {n}분 멈춤", "Scheduler stalled for {n} min"],
+    ["{n}초 안에 감시가 띄운다", "The watcher starts it within {n} s"],
+    ["{by}에서 껐다. 감시가 다시 띄우지 않는다. {on}에서 켠다", "Turned off from {by}. The watcher will not restart it. Turn it on from {on}"],
+    ["{n}분 안에 {n2}번 꺼져 다시 띄우기를 멈췄다. 원인을 고친 뒤 대시보드를 다시 켜거나 uv run jipsa run으로 켠다",
+      "It went down {n2} times within {n} min, so restarting stopped. Fix the cause, then restart the dashboard or start it with uv run jipsa run"],
+    ["끝: {why}(최고 {n}), {tail}", "Ended: {why} (best {n}), {tail}"],
+    ["끝: {why}({n}), {tail}", "Ended: {why} ({n}), {tail}"],
+    ["끝: {why}, {tail}", "Ended: {why}, {tail}"],
+    ["Auto 종합 보고 {s}", "Auto final report {s}"],
+    ["종합 보고 {s}", "final report {s}"],
+    ["목표 정하기 v{n} {s}({x})", "Goal setting v{n} {s} ({x})"],
+    ["목표 정하기 v{n} {s}", "Goal setting v{n} {s}"],
+    ["Cycle {n}, {s} 중", "Cycle {n}, {s} in progress"],
+    ["Cycle {n} 뒤 새 Cycle 멈춤", "New Cycles paused after Cycle {n}"],
+    ["Cycle {n}, 판정 {x}", "Cycle {n}, verdict {x}"],
+    ["Cycle {n}, 다음 단계 대기", "Cycle {n}, waiting for the next step"],
+    ["끝남({r})", "Ended ({r})"],
+    ["목표 도달(Cycle {n} 지표 {n2}, 목표 {n3} {d}, 사람 확인 {n4}개 대기)", "target reached (Cycle {n} metric {n2}, target {n3} {d}, {n4} human checks pending)"],
+    ["목표 도달(Cycle {n} 지표 {n2}, 목표 {n3} {d})", "target reached (Cycle {n} metric {n2}, target {n3} {d})"],
+    ["{n} Cycle 연속 나아지지 않음", "no gain for {n} Cycles in a row"],
+    ["다음 명령이 금지 사항({x})", "next plan is forbidden ({x})"],
+    ["Auto 마감 {hm} 전에 Cycle({n}분)을 마칠 수 없음", "cannot finish a Cycle ({n} min) before the Auto cutoff {hm}"],
+    ["Auto 마감 {hm}", "Auto cutoff {hm}"],
+    ["{hm} Main에서 작업자로({x})", "{hm} Main to worker ({x})"],
+    ["{hm} Main 이어 부르기 뒤 복귀", "{hm} back after Main resumed"],
+    ["{hm}에 시작한다", "starts at {hm}"],
+    ["시킨 줄. {s}({x})", "Assigned line. {s} ({x})"],
+    ["시킨 줄. {s}", "Assigned line. {s}"],
+    ["{x}. 다시 시키면 Cycle {n}부터 잇는다", "{x}. Run it again to continue from Cycle {n}"],
+    ["{n}분, 상한 {n2}분 넘김", "{n} min, over the {n2} min limit"],
+    ["{n}분/{n2}분", "{n}/{n2} min"],
+    ["{n}분", "{n} min"],
+    ["Cycle {n}번, 끝({r})", "Cycle {n}, ended ({r})"],
+    ["Cycle {n}번, 진행 중", "Cycle {n}, running"],
+    ["Cycle {n}번", "Cycle {n}"],
+    ["처음 {x}", "first {x}"],
+    ["최고 {x}", "best {x}"],
+    ["목표 {n} {d}", "target {n} {d}"],
+    ["주체 {o}, 이동 없음", "Owner {o}, no moves"],
+    ["주체 {o}, 이동 {x}", "Owner {o}, moves {x}"],
+    ["주체 {o}", "Owner {o}"],
+    ["이동 {x}", "moves {x}"],
+    ["사람 확인: {s}", "Human check: {s}"],
+    ["지표 {n}(차 {n2})", "metric {n} (change {n2})"],
+    ["지표 {n}", "metric {n}"],
+    ["판정 {x}", "verdict {x}"],
+    ["Cycle {n} {n2}({s})", "Cycle {n} {n2} ({s})"],
+    ["다음 명령(Cycle {n} 피드백 {r})", "Next plan (Cycle {n} feedback, {r})"],
+    ["Claude 5시간 창 사용 {n}%, {hm} 초기화, 주간 {n2}%", "Claude 5-hour window {n}% used, resets {hm}, weekly {n2}%"],
+    ["고를 것이 있는 것 {n}건", "To choose ({n})"],
+    ["확인만 하면 되는 것 {n}건", "Acknowledge only ({n})"],
+    ["분석: 지적 {n}건", "analysis: {n} issues"],
+    ["서칭: 출처 {n}건", "search: {n} sources"],
+    ["걸린 규칙은 {x}이다.", "Rule hit: {x}."],
+    ["반대 검토 {n}건: 모두 반영", "Counter-review {n}: all applied"],
+    ["Sol 판정은 {v}이다. 같은 공급자 공격이다.", "Sol verdict: {v}. Same-provider attack."],
+    ["Sol 판정은 {v}이다.", "Sol verdict: {v}."],
+    ["Sol 공격 없음({x}).", "No Sol attack ({x})."],
+    ["커밋: {x}", "Commit: {x}"],
+    ["열어 볼 파일: {x}", "Files to open: {x}"],
+    ["고를 것이 없다 (지금 {s}, 선택지와 정할 것 없음)", "Nothing to choose (now {s}, no options or decisions)"],
+    ["확인 필요나 끝난 실행이 아니다 (지금 {s})", "Not a Needs attention or finished run (now {s})"],
+    ["크기가 {n}바이트다. 0보다 크고 10MB 이하만 받는다", "The size is {n} bytes. Only more than 0 and up to 10 MB is accepted"],
+    ["runs/{x}가 없다", "runs/{x} does not exist"],
+    ["아직 처리되지 않았다. 열린 세션 {s}에 몇 초 안에 전달된다. {t}", "Not handled yet. It reaches the open session {s} within seconds. {t}"],
+    ["아직 처리되지 않았다. 부모 세션 {s}이 일하는 중이라 그 세션의 턴 끝이나 다음 입력 때 전달된다. {t}",
+      "Not handled yet. The parent session {s} is busy, so it is delivered at the end of its turn or at its next input. {t}"],
+    ["아직 처리되지 않았다. 지금 열린 세션이 없다. {t}", "Not handled yet. No session is open now. {t}"],
+    ["아직 처리되지 않았다. {t}", "Not handled yet. {t}"],
+    ["{x}. 세션이 열리면 받는다.", "{x}. A session picks it up when one opens."],
+    ["{hm}까지 세션이 받지 않으면 스케줄러 작업자로 넘긴다.", "If no session takes it by {hm}, it goes to a scheduler worker."],
+    ["세션 {s}이 {hm}에 받아 처리한다.", "Session {s} took it at {hm} and is handling it."],
+    ["세션이 받지 않아 {hm}에 스케줄러 작업자 {r}로 넘겼다. 그 실행의 지금 상태는 {st}이다.", "No session took it, so at {hm} it went to scheduler worker {r}. That run is now {st}."]
+  ];
+  const esc = (s) => s.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
+  const PAT = PAT_SRC.map(([ko, en]) => {
+    const names = [];
+    const body = ko.split(/(\{\w+\})/).map((part) => {
+      const m = /^\{(\w+)\}$/.exec(part);
+      if (!m) return esc(part);
+      names.push(m[1]);
+      return m[1] === "hm" ? "(\\d{1,2}:\\d{2})" : /^n\d*$/.test(m[1]) ? "(-?\\d[\\d,.]*)" : "(.+?)";
+    }).join("");
+    return { re: new RegExp(`^${body}$`), names, en };
+  });
+  const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  // 정확히 같은 문장만 바꾼다. 표 머리와 상태 글자처럼 한 낱말 칸에 쓴다
+  const TX = (s) => {
+    if (lang() !== "en" || s == null) return s;
+    const k = String(s);
+    return own(SRV, k) ? SRV[k] : own(EN, k) && !k.includes("{") ? EN[k] : k;
+  };
+  // 서버 문구 한 줄. 정확히 같은 문장, 다음으로 틀 문장 순서로 찾고 없으면 원문 그대로 둔다. 칸 안의 글은 같은 규칙으로 한 번 더 찾는다
+  const TS = (s, depth) => {
+    if (lang() !== "en" || s == null || s === "") return s;
+    const k = String(s), hit = TX(k);
+    if (hit !== k || (depth || 0) > 2) return hit;
+    for (const p of PAT) {
+      const m = p.re.exec(k);
+      if (!m) continue;
+      const vals = {};
+      p.names.forEach((nm, i) => { vals[nm] = nm === "hm" || /^[nx]\d*$/.test(nm) ? m[i + 1] : TS(m[i + 1], (depth || 0) + 1); });
+      return p.en.replace(/\{(\w+)\}/g, (x, nm) => (own(vals, nm) ? vals[nm] : x));
+    }
+    return k;
+  };
+  // 선택지 이름(1안, A안, 가안, 안 2). 단추 글자만 바꾸고 답으로 보내는 값은 원래 이름이다
+  const GA = "가나다라마바사아자", GA_EN = ["Ga", "Na", "Da", "Ra", "Ma", "Ba", "Sa", "Ah", "Ja"];
+  const optName = (n) => {
+    if (lang() !== "en") return n;
+    const s = String(n || ""); let m;
+    if ((m = /^(\d+)\s?안$/.exec(s)) || (m = /^안\s?(\d+)$/.exec(s)) || (m = /^([A-Z])\s?안$/.exec(s))) return `Option ${m[1]}`;
+    if ((m = /^([가-자])안$/.exec(s)) && GA.includes(m[1])) return `Option ${GA_EN[GA.indexOf(m[1])]}`;
+    return s;
+  };
+  // 결과지 요약 상자 줄 머리(policies/report.md의 한 일, 결과, 사람이 할 일). 줄 맨 앞 굵은 이름만 바꾼다
+  const SUM = { "한 일": "What was done", "결과": "Result", "사람이 할 일": "Action for you" };
+  const sumLine = (l) => (lang() !== "en" ? l : l.replace(/^(\s*[-*]?\s*)\*\*([^*:]+?)(:?)\*\*/, (m, a, name, c) => (own(SUM, name.trim()) ? `${a}**${SUM[name.trim()]}${c}**` : m)));
+  // Sol 공격 표의 값 칸(심각도, 종류, 답). 표 머리에 심각도와 답이 같이 있을 때만 쓴다
+  const ATK = { "상": "High", "중": "Medium", "하": "Low", "사실과 수치": "Facts and numbers", "완료 기준": "Completion criteria", "범위 밖 변경": "Out-of-scope change",
+    "측정 방법": "Measurement method", "읽기 쉬움": "Readability", "반영": "Applied", "반박": "Rebutted", "사람": "Human", "답 없음": "No answer" };
+  const atkCell = (s) => (lang() === "en" && own(ATK, s) ? ATK[s] : s);
+  // 결과지 반대 검토 접기 줄. '반대 검토 3건: 반영 1, 반박 2'
+  const foldTitle = (s) => {
+    if (lang() !== "en") return s;
+    const m = /^반대 검토 (\d+)건: (.+)$/.exec(s);
+    if (!m || m[2] === "모두 반영") return TS(s);
+    return `Counter-review ${m[1]}: ` + m[2].replace(/(반영|반박|사람|답 없음) (\d+)/g, (x, k, n) => `${ATK[k].toLowerCase()} ${n}`);
+  };
+  // 오늘 보고 한 줄. 머리 줄 집계, 절 아래 '- 없음', 보조 줄의 라벨(선택지, 걸린 규칙, 확인, 주체와 토큰 등)만 바꾸고 뒤 글은 둔다
+  const DAY_LABEL = { "선택지": "Options", "걸린 규칙": "Rule hit", "확인": "Acknowledge", "판 수 상한": "Match cap", "주체": "Owner",
+    "추가 패키지": "Added packages", "한도 대기": "Limit wait", "자원 대기": "Resource wait" };
+  // cycle 절 보조 줄의 라벨. 값도 정확히 맞는 문장이나 틀 문장이면 바꾼다
+  const CYC_LABEL = { "실패 범주": "Failure classes", "버린 가설": "Discarded hypotheses", "판정 값": "Judged value", "종합 보고": "Final report" };
+  // 표 칸 하나씩. 칸 전체가 맞지 않으면 쉼표로 나눈 조각마다 찾는다
+  const cells = (parts) => parts.map((p) => { const t = TS(p); return t !== p ? t : p.split(", ").map((x) => TS(x)).join(", "); });
+  const dayLine = (line) => {
+    if (lang() !== "en") return line;
+    let m = /^\[jipsa\] (\S+) (.+)$/.exec(line);
+    if (m) return `[jipsa] ${m[1]} ` + m[2].split(", ").map((p) => p.replace(/^(.+?) (\d+)(?:\(실패 (\d+) 포함\))?$/, (x, s, n, f) => `${TX(s)} ${n}${f ? ` (incl. ${f} failed)` : ""}`)).join(", ");
+    if (/^\s*- 없음\s*$/.test(line)) return line.replace("없음", "None");
+    if (/^### (고를 것이 있는 것|확인만 하면 되는 것) \d+건$/.test(line)) return `### ${TS(line.slice(4))}`;
+    // cycle 절의 목표 줄과 Cycle 줄. 첫 칸(목표 제목, Cycle 명령)은 작업 글이라 두고 뒤 칸만 바꾼다
+    m = /^- 목표 (\S+) \| (.+)$/.exec(line);
+    if (m) { const [title, ...rest] = m[2].split(" | "); return `- Goal ${m[1]} | ${[title, ...cells(rest)].join(" | ")}`; }
+    m = /^(\s+- )(Cycle \d+번, .+)$/.exec(line);
+    if (m) return m[1] + cells(m[2].split(" | ")).join(" | ");
+    m = /^(\s+- )(Cycle \d+: .+)$/.exec(line);
+    if (m) { const [head, ...rest] = m[2].split(" | "); return m[1] + [head, ...cells(rest)].join(" | "); }
+    m = /^- (Claude 5시간 창 .+)$/.exec(line);
+    if (m) return `- ${TS(m[1])}`;
+    m = /^(\s*- )([^:|]+?): (.*)$/.exec(line);
+    if (m && own(CYC_LABEL, m[2])) return `${m[1]}${CYC_LABEL[m[2]]}: ${TS(m[3])}`;
+    if (m && !own(DAY_LABEL, m[2]) && TS(m[2]) !== m[2]) return `${m[1]}${TS(m[2])}: ${m[3]}`; // 다음 명령(Cycle 1 피드백 1순위): 명령 글
+    if (!m || !own(DAY_LABEL, m[2])) {
+      const bits = /^(\s+- )(분석: 지적 \d+건|서칭: 출처 \d+건|분석자 같은 공급자)((?:\. .+)?)$/.exec(line);
+      return bits ? bits[1] + `${bits[2]}${bits[3]}`.split(". ").map((b) => TS(b)).join(". ") : line;
+    }
+    let rest = m[3];
+    if (m[2] === "선택지") rest = rest.split(" / ").map((o) => o.replace(/^\(추천\) /, "(recommended) ")).join(" / ");
+    if (m[2] === "확인") rest = rest.replace(/^결과지에서 확인하면 완료로 바뀐다 /, "acknowledging on the result sheet turns it Done ");
+    if (m[2] === "주체") {
+      const t = /^(.+?)\.(?: 토큰: 출력 ([\d,]+), 캐시 읽기 ([\d,]+))?$/.exec(rest);
+      if (t) rest = `${TX(t[1])}.` + (t[2] ? ` Tokens: output ${t[2]}, cache read ${t[3]}` : "");
+    }
+    return `${m[1]}${DAY_LABEL[m[2]]}: ${rest}`;
+  };
+  // 오늘 보고 항목 줄의 결과 칸 머리('확인 필요(실패): ', '완료(원래 실패): ', '확인함: ')
+  const resultHead = (s) => (lang() !== "en" ? s : String(s).replace(/^(확인 필요\(실패\)|완료\(원래 실패\)|확인함): /, (x, k) => `${TX(k)}: `));
+  window.I18N = { en: EN, srv: SRV, pat: PAT_SRC, lang, T, applyStatic, KEY: "jipsa.lang" };
+  Object.assign(window, { TS, TX, optName, sumLine, atkCell, foldTitle, dayLine, resultHead });
   window.T = T;
   window.applyStatic = applyStatic;
 })();
