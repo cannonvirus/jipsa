@@ -8,11 +8,11 @@
 
 [한국어](README.md) | [English](README.en.md)
 
-*The dashboard and the screenshots in this document are in Korean. Screen labels below are given in English with the actual Korean label in parentheses.*
+*The screenshots in this document show the dashboard in English. The dashboard switches between Korean and English with the KOR/ENG button at the top. Screen labels below are given in English with the Korean label in parentheses.*
 
 <img src="docs/img/structure-en.gif" width="560" alt="Animated structure of one task. Write a to-do and press Do; it goes through the queue, a worker, a worktree commit, and counter-review, and comes back as one result sheet and one Slack line. If it needs attention you pick an option, and automation stops at a commit">
 
-![Board screen](docs/img/dashboard-board.png)
+![Board screen](docs/img/dashboard-board-en.png)
 
 </div>
 
@@ -46,11 +46,11 @@ To receive results in Slack, type `/jipsa-slack` in a Claude Code session in the
 
 A person queues and picks tasks on the dashboard, execution runs in a worktree per repository, and the records are gathered in one place.
 
-![Overall structure](docs/img/architecture.png)
+![Overall structure](docs/img/architecture-en.png)
 
 A single task receives its completion criteria, leaves evidence at each step, passes the counter-review, and ends as one result sheet.
 
-![Flow of a single task](docs/img/task-flow.png)
+![Flow of a single task](docs/img/task-flow-en.png)
 
 <details markdown="1">
 <summary>Folder layout</summary>
